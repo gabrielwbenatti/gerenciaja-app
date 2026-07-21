@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Table, Button, Modal, TextInput, NumberInput, Select, Switch,
   Group, Stack, Badge, Card, Text, Loader, Center,
@@ -8,6 +8,7 @@ import { useDisclosure } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { api } from '../api'
 import { PageHeader } from '../components/PageHeader'
+import { normalizeBusca } from '../lib/format'
 
 const UNIDADES = ['UN', 'KG', 'G', 'CX', 'L', 'ML', 'M', 'M2', 'M3', 'PC']
 const brl = (v) =>
@@ -16,7 +17,16 @@ const brl = (v) =>
 export default function Produtos() {
   const [lista, setLista] = useState(null)
   const [erro, setErro] = useState(null)
+  const [filtro, setFiltro] = useState('')
   const [aberto, { open, close }] = useDisclosure(false)
+
+  const listaFiltrada = useMemo(() => {
+    if (!lista) return null
+    const q = normalizeBusca(filtro)
+    if (!q) return lista
+    return lista.filter((p) =>
+      normalizeBusca([p.sku, p.nome, p.descricao, p.codigoBarras].filter(Boolean).join(' ')).includes(q))
+  }, [lista, filtro])
 
   async function carregar() {
     setErro(null)
@@ -46,13 +56,25 @@ export default function Produtos() {
         action={<Button onClick={open}>Novo produto</Button>}
       />
 
+      {lista && lista.length > 0 && (
+        <TextInput
+          placeholder="Buscar por SKU, nome ou código de barras…"
+          value={filtro}
+          onChange={(e) => setFiltro(e.currentTarget.value)}
+          maw={420}
+        />
+      )}
+
       <Card withBorder padding={0}>
         {erro && <Text c="red" p="md">{erro}</Text>}
         {lista === null && !erro && <Center p="xl"><Loader /></Center>}
         {lista && lista.length === 0 && (
           <Text c="dimmed" ta="center" p="xl">Nenhum produto cadastrado ainda.</Text>
         )}
-        {lista && lista.length > 0 && (
+        {lista && lista.length > 0 && listaFiltrada.length === 0 && (
+          <Text c="dimmed" ta="center" p="xl">Nenhum produto encontrado para “{filtro}”.</Text>
+        )}
+        {listaFiltrada && listaFiltrada.length > 0 && (
           <Table.ScrollContainer minWidth={760}>
             <Table highlightOnHover verticalSpacing="sm">
               <Table.Thead>
@@ -64,7 +86,7 @@ export default function Produtos() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {lista.map((p) => (
+                {listaFiltrada.map((p) => (
                   <Table.Tr key={p.id} opacity={p.ativo ? 1 : 0.5}>
                     <Table.Td>{p.sku}</Table.Td>
                     <Table.Td>{p.nome}</Table.Td>
@@ -147,7 +169,7 @@ function FormProduto({ aoSalvar }) {
         <Group grow>
           <Select label="Unidade" data={UNIDADES} allowDeselect={false}
                   {...form.getInputProps('unidadeMedida')} />
-          <TextInput label="NCM" maxLength={8} description="Opcional — usado na NF-e"
+          <TextInput label="NCM" maxLength={8} placeholder="opcional — usado na NF-e"
                      {...form.getInputProps('ncm')} />
         </Group>
         <Group grow>

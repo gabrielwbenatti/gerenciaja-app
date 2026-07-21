@@ -11,6 +11,7 @@ import Estoque from './pages/Estoque'
 import Extrato from './pages/Extrato'
 import NotasEntrada from './pages/NotasEntrada'
 import NotaEntradaDetalhe from './pages/NotaEntradaDetalhe'
+import Configuracoes from './pages/Configuracoes'
 
 export default function App() {
   // Fonte de verdade da "sessao" provisoria: a empresa no localStorage.
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="/notas/:id" element={<NotaEntradaDetalhe />} />
           <Route path="/estoque" element={<Estoque />} />
           <Route path="/estoque/:produtoId" element={<Extrato />} />
+          <Route path="/configuracoes" element={<Configuracoes />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       ) : (

@@ -9,6 +9,7 @@ const LINKS = [
   { to: '/recebimento', label: 'Entrada de mercadoria' },
   { to: '/notas', label: 'Notas de entrada' },
   { to: '/estoque', label: 'Estoque' },
+  { to: '/configuracoes', label: 'Configurações' },
 ]
 
 export default function Layout({ empresa, aoSair }) {

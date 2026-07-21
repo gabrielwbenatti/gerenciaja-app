@@ -7,7 +7,14 @@ import { notifications } from '@mantine/notifications'
 import { api } from '../api'
 import { getEmpresa } from '../tenant'
 import { PageHeader } from '../components/PageHeader'
-import { formatDocument } from '../lib/format'
+import { formatDocument, normalizeBusca } from '../lib/format'
+
+// Filtro que ignora formatação: "60575" acha "60.575...". Vale para nome e doc.
+const filtroBusca = ({ options, search }) => {
+  const q = normalizeBusca(search)
+  if (!q) return options
+  return options.filter((o) => o.label && normalizeBusca(o.label).includes(q))
+}
 
 const hoje = () => new Date().toISOString().slice(0, 10)
 const brl = (v) =>
@@ -157,7 +164,7 @@ function FormRecebimento({ empresa, fornecedores, produtos }) {
         <Title order={4} mb="md">Nota fiscal</Title>
         <Stack>
           <Select label="Fornecedor" withAsterisk searchable data={optFornecedores}
-                  value={fornecedorId} onChange={setFornecedorId}
+                  value={fornecedorId} onChange={setFornecedorId} filter={filtroBusca}
                   placeholder="Buscar por nome ou CNPJ…" nothingFoundMessage="Nada encontrado" />
           <Group grow>
             <TextInput label="Série" withAsterisk value={nota.serie}
@@ -187,7 +194,7 @@ function FormRecebimento({ empresa, fornecedores, produtos }) {
               <Card key={i} withBorder padding="sm" bg="var(--mantine-color-gray-0)">
                 <Grid align="flex-end" gutter="xs">
                   <Grid.Col span={{ base: 12, md: controla ? 4 : 5 }}>
-                    <Select label="Produto" searchable data={optProdutos}
+                    <Select label="Produto" searchable data={optProdutos} filter={filtroBusca}
                             value={it.produtoId || null}
                             onChange={(v) => setItem(i, 'produtoId', v || '')}
                             placeholder="Buscar produto…" nothingFoundMessage="Nada encontrado" />

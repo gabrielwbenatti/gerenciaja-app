@@ -7,10 +7,14 @@ import { useForm } from '@mantine/form'
 import { useDisclosure } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { api } from '../api'
+import { getEmpresa } from '../tenant'
 import { PageHeader } from '../components/PageHeader'
 import { maskDocument, formatDocument, limparDocumento } from '../lib/format'
 
 const PAPEIS = ['CLIENTE', 'FORNECEDOR', 'TRANSPORTADORA', 'VENDEDOR']
+
+// Empresa exige documento? undefined (empresa antiga no localStorage) => exige.
+const exigeDocumento = () => getEmpresa()?.documentoPessoaObrigatorio !== false
 
 export default function Pessoas() {
   const [lista, setLista] = useState(null)
@@ -84,6 +88,7 @@ export default function Pessoas() {
 
 function FormPessoa({ aoSalvar }) {
   const [enviando, setEnviando] = useState(false)
+  const documentoObrigatorio = exigeDocumento()
 
   const form = useForm({
     initialValues: {
@@ -93,6 +98,8 @@ function FormPessoa({ aoSalvar }) {
     validate: {
       documento: (v, values) => {
         const n = limparDocumento(v).length
+        // Vazio só é válido se a empresa não exige documento.
+        if (n === 0) return documentoObrigatorio ? 'Informe o CPF/CNPJ' : null
         const esperado = values.tipo === 'PF' ? 11 : 14
         return n === esperado ? null : `${values.tipo === 'PF' ? 'CPF' : 'CNPJ'} incompleto`
       },
@@ -129,9 +136,8 @@ function FormPessoa({ aoSalvar }) {
     <form onSubmit={form.onSubmit(enviar)}>
       <Stack>
         <Group grow align="flex-start">
-          <TextInput label="CPF / CNPJ" withAsterisk data-autofocus
+          <TextInput label="CPF / CNPJ" withAsterisk={documentoObrigatorio} data-autofocus
                      placeholder="CPF (11 dígitos) ou CNPJ (14)"
-                     description="O tipo se ajusta sozinho"
                      value={form.values.documento} onChange={onDocumento}
                      error={form.errors.documento} />
           <Select label="Tipo" data={[

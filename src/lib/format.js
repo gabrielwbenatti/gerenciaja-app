@@ -11,6 +11,21 @@ export function limparDocumento(valor) {
 }
 
 /**
+ * Normaliza texto para BUSCA: sem acento, minúsculo, e sem os separadores de
+ * documento (. - /). Assim "60575" acha "60.575..." e "joao" acha "João".
+ * Mantém espaços e letras para continuar casando por nome.
+ */
+export function normalizeBusca(s) {
+  return (s ?? '')
+    .toString()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[.\-/]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+/**
  * Máscara progressiva para input: reformata a cada tecla a partir do que já foi
  * digitado (sem exigir o tamanho final). CPF (000.000.000-00) até 11 caracteres;
  * reflui para CNPJ (00.000.000/0000-00) ao passar de 11.
