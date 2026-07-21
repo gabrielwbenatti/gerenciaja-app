@@ -1,32 +1,46 @@
-import { PaginaTopo } from '../ui'
+import { Card, Title, Text, SimpleGrid, Stack } from '@mantine/core'
+import { PageHeader } from '../components/PageHeader'
 import { formatDocument } from '../lib/format'
 
+const REGIME_LABEL = {
+  SIMPLES_NACIONAL: 'Simples Nacional',
+  LUCRO_PRESUMIDO: 'Lucro Presumido',
+  LUCRO_REAL: 'Lucro Real',
+}
+
+function Info({ label, value }) {
+  return (
+    <div>
+      <Text size="xs" c="dimmed" tt="uppercase" fw={600}>{label}</Text>
+      <Text fw={500}>{value}</Text>
+    </div>
+  )
+}
+
 export default function Inicio({ empresa }) {
-  const regimeLabel = {
-    SIMPLES_NACIONAL: 'Simples Nacional',
-    LUCRO_PRESUMIDO: 'Lucro Presumido',
-    LUCRO_REAL: 'Lucro Real',
-  }[empresa?.regimeTributario] || empresa?.regimeTributario
+  const regime = REGIME_LABEL[empresa?.regimeTributario] || empresa?.regimeTributario
 
   return (
-    <>
-      <PaginaTopo titulo="Início" descricao="Visão geral da empresa" />
-      <div className="card">
-        <h2>{empresa?.razaoSocial}</h2>
-        <div className="form-grid">
-          <div><div className="rotulo" style={{ color: 'var(--muted)', fontSize: 12 }}>CNPJ</div>{formatDocument(empresa?.cnpj)}</div>
-          <div><div className="rotulo" style={{ color: 'var(--muted)', fontSize: 12 }}>Regime</div>{regimeLabel}</div>
-          <div><div className="rotulo" style={{ color: 'var(--muted)', fontSize: 12 }}>Depósito padrão</div>#{empresa?.depositoPadraoId}</div>
-        </div>
-      </div>
-      <div className="card">
-        <h2>Como está o sistema</h2>
-        <p style={{ color: 'var(--muted)', fontSize: 14 }}>
-          Já funcionam: cadastro de <strong>pessoas</strong> (clientes e fornecedores)
-          e de <strong>produtos</strong> (com e sem controle de lote). A entrada de
-          mercadoria por nota fiscal existe na API e será exposta aqui em breve.
-        </p>
-      </div>
-    </>
+    <Stack>
+      <PageHeader title="Início" subtitle="Visão geral da empresa" />
+
+      <Card withBorder padding="lg">
+        <Title order={4} mb="md">{empresa?.razaoSocial}</Title>
+        <SimpleGrid cols={{ base: 1, sm: 3 }}>
+          <Info label="CNPJ" value={formatDocument(empresa?.cnpj)} />
+          <Info label="Regime" value={regime} />
+          <Info label="Depósito padrão" value={`#${empresa?.depositoPadraoId}`} />
+        </SimpleGrid>
+      </Card>
+
+      <Card withBorder padding="lg">
+        <Title order={4} mb="sm">Como está o sistema</Title>
+        <Text c="dimmed" size="sm">
+          Já funcionam: cadastro de <b>pessoas</b> (clientes e fornecedores) e de{' '}
+          <b>produtos</b> (com e sem controle de lote), <b>entrada de mercadoria</b> por
+          nota fiscal, consulta de <b>notas</b> e <b>estoque</b> com extrato.
+        </Text>
+      </Card>
+    </Stack>
   )
 }

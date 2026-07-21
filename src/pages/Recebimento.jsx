@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
+import {
+  Card, Select, TextInput, NumberInput, Button, ActionIcon, Grid, Group, Stack,
+  Text, Title, Badge, Divider, Loader, Center, Alert,
+} from '@mantine/core'
+import { notifications } from '@mantine/notifications'
 import { api } from '../api'
 import { getEmpresa } from '../tenant'
-import { Campo, Alerta, PaginaTopo } from '../ui'
-import Combobox from '../components/Combobox'
+import { PageHeader } from '../components/PageHeader'
 import { formatDocument } from '../lib/format'
 
 const hoje = () => new Date().toISOString().slice(0, 10)
-
 const brl = (v) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
-
 const num = (v) => (v === '' || v == null ? 0 : Number(v))
 const arred2 = (v) => Math.round(v * 100) / 100
 
@@ -31,27 +33,32 @@ export default function Recebimento() {
       .catch((e) => setErroCarga(e.message))
   }, [])
 
-  if (erroCarga) return <div className="card"><Alerta tipo="erro">{erroCarga}</Alerta></div>
-  if (!fornecedores || !produtos) return <div className="carregando">Carregando…</div>
+  if (erroCarga) return <Alert color="red">{erroCarga}</Alert>
+  if (!fornecedores || !produtos) return <Center p="xl"><Loader /></Center>
 
   return (
-    <>
-      <PaginaTopo titulo="Entrada de mercadoria"
-                  descricao="Escrituração de NF-e: estoque, custo e contas a pagar em uma operação" />
+    <Stack>
+      <PageHeader title="Entrada de mercadoria"
+        subtitle="Escrituração de NF-e: estoque, custo e contas a pagar em uma operação" />
       {fornecedores.length === 0 && (
-        <Alerta tipo="erro">Cadastre ao menos um fornecedor em “Pessoas” antes de dar entrada.</Alerta>
+        <Alert color="yellow">Cadastre ao menos um fornecedor em “Pessoas” antes de dar entrada.</Alert>
       )}
       {produtos.length === 0 && (
-        <Alerta tipo="erro">Cadastre ao menos um produto antes de dar entrada.</Alerta>
+        <Alert color="yellow">Cadastre ao menos um produto antes de dar entrada.</Alert>
       )}
       <FormRecebimento empresa={empresa} fornecedores={fornecedores} produtos={produtos} />
-    </>
+    </Stack>
   )
 }
 
 function FormRecebimento({ empresa, fornecedores, produtos }) {
   const produtoPorId = useMemo(
     () => Object.fromEntries(produtos.map((p) => [String(p.id), p])), [produtos])
+  const optFornecedores = useMemo(
+    () => fornecedores.map((f) => ({ value: String(f.id), label: `${f.nome} — ${formatDocument(f.documento)}` })),
+    [fornecedores])
+  const optProdutos = useMemo(
+    () => produtos.map((p) => ({ value: String(p.id), label: `${p.sku} — ${p.nome}` })), [produtos])
 
   const [fornecedorId, setFornecedorId] = useState('')
   const [nota, setNota] = useState({
@@ -60,46 +67,34 @@ function FormRecebimento({ empresa, fornecedores, produtos }) {
   })
   const [itens, setItens] = useState([itemVazio()])
   const [duplicatas, setDuplicatas] = useState([dupVazia()])
-  const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState(null)
-  // Chave estavel por formulario: reenviar a mesma nota nao duplica a entrada.
   const [chaveIdem] = useState(() => 'web-' + crypto.randomUUID())
 
-  const setN = (campo) => (e) => setNota({ ...nota, [campo]: e.target.value })
-
-  // -- itens ---------------------------------------------------------------
+  const setN = (campo) => (valor) => setNota((n) => ({ ...n, [campo]: valor }))
   function setItem(i, campo, valor) {
     setItens((arr) => arr.map((it, idx) => (idx === i ? { ...it, [campo]: valor } : it)))
   }
   const totalItem = (it) => arred2(num(it.quantidadeDeclarada) * num(it.valorUnitario))
 
-  // -- totais ---------------------------------------------------------------
   const somaItens = arred2(itens.reduce((s, it) => s + totalItem(it), 0))
   const totalSugerido = arred2(somaItens + num(nota.valorFrete) - num(nota.valorDesconto))
   const somaDuplicatas = arred2(duplicatas.reduce((s, d) => s + num(d.valor), 0))
   const totalNota = num(nota.valorTotal)
-  // Bonificacao/desconto: as duplicatas (o que se paga) podem somar MENOS que o
-  // total da nota. So nao podem passar do total. A diferenca fica visivel.
   const naoCobrado = arred2(totalNota - somaDuplicatas)
   const duplicatasValidas = totalNota > 0 && somaDuplicatas <= arred2(totalNota)
 
-  async function enviar(e) {
-    e.preventDefault()
-    setErro(null)
-    setResultado(null)
-
-    if (!fornecedorId) return setErro('Selecione o fornecedor.')
-    if (itens.some((it) => !it.produtoId)) return setErro('Todo item precisa de um produto selecionado.')
+  async function enviar() {
+    if (!fornecedorId) return notifications.show({ color: 'red', message: 'Selecione o fornecedor.' })
+    if (itens.some((it) => !it.produtoId))
+      return notifications.show({ color: 'red', message: 'Todo item precisa de um produto.' })
     for (const it of itens) {
       const prod = produtoPorId[it.produtoId]
-      if (prod?.controlaLote && !it.loteCodigo.trim()) {
-        return setErro(`O produto ${prod.sku} controla lote — informe o código do lote.`)
-      }
+      if (prod?.controlaLote && !it.loteCodigo.trim())
+        return notifications.show({ color: 'red', message: `${prod.sku} controla lote — informe o código.` })
     }
-    if (!duplicatasValidas) {
-      return setErro(`As duplicatas somam ${brl(somaDuplicatas)} e não podem passar do total da nota (${brl(totalNota)}).`)
-    }
+    if (!duplicatasValidas)
+      return notifications.show({ color: 'red', message: `Duplicatas (${brl(somaDuplicatas)}) passam do total (${brl(totalNota)}).` })
 
     const comando = {
       fornecedorId: Number(fornecedorId),
@@ -121,16 +116,16 @@ function FormRecebimento({ empresa, fornecedores, produtos }) {
         loteCodigo: it.loteCodigo || null,
         dataValidade: it.dataValidade || null,
       })),
-      duplicatas: duplicatas.map((d) => ({
-        numero: d.numero, vencimento: d.vencimento, valor: num(d.valor),
-      })),
+      duplicatas: duplicatas.map((d) => ({ numero: d.numero, vencimento: d.vencimento, valor: num(d.valor) })),
     }
 
     setEnviando(true)
     try {
-      setResultado(await api.post('/recebimentos', comando))
+      const r = await api.post('/recebimentos', comando)
+      setResultado(r)
+      notifications.show({ color: 'green', message: 'Entrada registrada.' })
     } catch (err) {
-      setErro(err.message)
+      notifications.show({ color: 'red', title: 'Erro ao registrar', message: err.message })
     } finally {
       setEnviando(false)
     }
@@ -138,180 +133,167 @@ function FormRecebimento({ empresa, fornecedores, produtos }) {
 
   if (resultado) {
     return (
-      <div className="card">
-        <div className="resultado-ok">
-          <h3>{resultado.jaEscriturada ? 'Nota já escriturada (reenvio)' : 'Entrada registrada com sucesso'}</h3>
-          <div className="linha-res"><span className="rot">Nota fiscal</span> #{resultado.notaFiscalEntradaId}</div>
-          <div className="linha-res"><span className="rot">Recebimento</span> #{resultado.recebimentoId}</div>
-          <div className="linha-res"><span className="rot">Contas a pagar</span> {resultado.contasPagarIds.join(', ') || '—'}</div>
-          <div className="linha-res"><span className="rot">Movimentos de estoque</span> {resultado.movimentosEstoqueIds.join(', ') || '—'}</div>
-          {resultado.comDivergencia && (
-            <div className="linha-res"><span className="aviso-diverg">⚠ Há divergência entre o declarado e o recebido — registrada como ocorrência.</span></div>
-          )}
-        </div>
-        <button className="btn" onClick={() => window.location.reload()}>Nova entrada</button>
-      </div>
+      <Card withBorder padding="lg">
+        <Alert color={resultado.comDivergencia ? 'yellow' : 'green'}
+               title={resultado.jaEscriturada ? 'Nota já escriturada (reenvio)' : 'Entrada registrada com sucesso'}>
+          <Stack gap={4}>
+            <Text size="sm">Nota fiscal #{resultado.notaFiscalEntradaId}</Text>
+            <Text size="sm">Recebimento #{resultado.recebimentoId}</Text>
+            <Text size="sm">Contas a pagar: {resultado.contasPagarIds.join(', ') || '—'}</Text>
+            <Text size="sm">Movimentos de estoque: {resultado.movimentosEstoqueIds.join(', ') || '—'}</Text>
+            {resultado.comDivergencia && (
+              <Text size="sm" fw={500}>⚠ Há divergência entre declarado e recebido — registrada como ocorrência.</Text>
+            )}
+          </Stack>
+        </Alert>
+        <Button mt="md" onClick={() => window.location.reload()}>Nova entrada</Button>
+      </Card>
     )
   }
 
   return (
-    <form onSubmit={enviar}>
-      <Alerta tipo="erro">{erro}</Alerta>
+    <Stack>
+      <Card withBorder padding="lg">
+        <Title order={4} mb="md">Nota fiscal</Title>
+        <Stack>
+          <Select label="Fornecedor" withAsterisk searchable data={optFornecedores}
+                  value={fornecedorId} onChange={setFornecedorId}
+                  placeholder="Buscar por nome ou CNPJ…" nothingFoundMessage="Nada encontrado" />
+          <Group grow>
+            <TextInput label="Série" withAsterisk value={nota.serie}
+                       onChange={(e) => setN('serie')(e.currentTarget.value)} />
+            <TextInput label="Número" withAsterisk value={nota.numero}
+                       onChange={(e) => setN('numero')(e.currentTarget.value)} />
+            <TextInput label="Emissão" type="date" value={nota.dataEmissao}
+                       onChange={(e) => setN('dataEmissao')(e.currentTarget.value)} />
+            <TextInput label="Entrada" type="date" value={nota.dataEntrada}
+                       onChange={(e) => setN('dataEntrada')(e.currentTarget.value)} />
+          </Group>
+          <Group grow>
+            <NumberInput label="Frete" min={0} decimalScale={2} prefix="R$ "
+                         value={nota.valorFrete} onChange={setN('valorFrete')} />
+            <NumberInput label="Desconto" min={0} decimalScale={2} prefix="R$ "
+                         value={nota.valorDesconto} onChange={setN('valorDesconto')} />
+          </Group>
+        </Stack>
+      </Card>
 
-      <div className="card">
-        <h2>Nota fiscal</h2>
-        <div className="form-grid">
-          <Campo label="Fornecedor" req full ajuda="Busque por nome ou CNPJ/CPF">
-            <Combobox
-              items={fornecedores}
-              value={fornecedorId}
-              onChange={setFornecedorId}
-              getId={(f) => f.id}
-              getPrimary={(f) => f.nome}
-              getSecondary={(f) => formatDocument(f.documento) + (f.nomeFantasia ? ' · ' + f.nomeFantasia : '')}
-              termos={(f) => [f.nome, f.nomeFantasia, f.documento, formatDocument(f.documento)].filter(Boolean).join(' ')}
-              placeholder="Buscar fornecedor…"
-            />
-          </Campo>
-          <Campo label="Série" req><input value={nota.serie} onChange={setN('serie')} required /></Campo>
-          <Campo label="Número" req><input value={nota.numero} onChange={setN('numero')} required /></Campo>
-          <Campo label="Data de emissão" req>
-            <input type="date" value={nota.dataEmissao} onChange={setN('dataEmissao')} required />
-          </Campo>
-          <Campo label="Data de entrada" req>
-            <input type="date" value={nota.dataEntrada} onChange={setN('dataEntrada')} required />
-          </Campo>
-          <Campo label="Frete">
-            <input type="number" step="0.01" min="0" value={nota.valorFrete} onChange={setN('valorFrete')} />
-          </Campo>
-          <Campo label="Desconto">
-            <input type="number" step="0.01" min="0" value={nota.valorDesconto} onChange={setN('valorDesconto')} />
-          </Campo>
-        </div>
-      </div>
+      <Card withBorder padding="lg">
+        <Title order={4} mb="md">Itens</Title>
+        <Stack gap="sm">
+          {itens.map((it, i) => {
+            const controla = produtoPorId[it.produtoId]?.controlaLote
+            return (
+              <Card key={i} withBorder padding="sm" bg="var(--mantine-color-gray-0)">
+                <Grid align="flex-end" gutter="xs">
+                  <Grid.Col span={{ base: 12, md: controla ? 4 : 5 }}>
+                    <Select label="Produto" searchable data={optProdutos}
+                            value={it.produtoId || null}
+                            onChange={(v) => setItem(i, 'produtoId', v || '')}
+                            placeholder="Buscar produto…" nothingFoundMessage="Nada encontrado" />
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 4, md: 2 }}>
+                    <NumberInput label="Qtd. nota" min={0} decimalScale={3} value={it.quantidadeDeclarada}
+                                 onChange={(v) => {
+                                   setItem(i, 'quantidadeDeclarada', v)
+                                   if (it.quantidadeRecebida === '' || it.quantidadeRecebida === it.quantidadeDeclarada)
+                                     setItem(i, 'quantidadeRecebida', v)
+                                 }} />
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 4, md: 2 }}>
+                    <NumberInput label="Qtd. recebida" min={0} decimalScale={3}
+                                 value={it.quantidadeRecebida}
+                                 onChange={(v) => setItem(i, 'quantidadeRecebida', v)} />
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 4, md: 2 }}>
+                    <NumberInput label="Vlr. unit." min={0} decimalScale={4} prefix="R$ "
+                                 value={it.valorUnitario}
+                                 onChange={(v) => setItem(i, 'valorUnitario', v)} />
+                  </Grid.Col>
+                  {controla && (
+                    <>
+                      <Grid.Col span={{ base: 6, md: 1.5 }}>
+                        <TextInput label="Lote" value={it.loteCodigo}
+                                   onChange={(e) => setItem(i, 'loteCodigo', e.currentTarget.value)} />
+                      </Grid.Col>
+                      <Grid.Col span={{ base: 6, md: 2 }}>
+                        <TextInput label="Validade" type="date" value={it.dataValidade}
+                                   onChange={(e) => setItem(i, 'dataValidade', e.currentTarget.value)} />
+                      </Grid.Col>
+                    </>
+                  )}
+                  <Grid.Col span={{ base: 12, md: controla ? 12 : 1 }}>
+                    <Group justify="flex-end">
+                      <ActionIcon variant="subtle" color="red" disabled={itens.length === 1}
+                                  onClick={() => setItens((a) => a.filter((_, idx) => idx !== i))}>
+                        ✕
+                      </ActionIcon>
+                    </Group>
+                  </Grid.Col>
+                </Grid>
+              </Card>
+            )
+          })}
+        </Stack>
+        <Button variant="light" size="xs" mt="sm"
+                onClick={() => setItens((a) => [...a, itemVazio()])}>+ Adicionar item</Button>
+      </Card>
 
-      <div className="card">
-        <h2>Itens</h2>
-        {itens.map((it, i) => {
-          const prod = produtoPorId[it.produtoId]
-          const controla = prod?.controlaLote
-          return (
-            <div key={i} className="linha-item"
-                 style={{ gridTemplateColumns: controla ? '2fr 1fr 1fr 1fr 1.2fr 1.2fr auto' : '2fr 1fr 1fr 1fr auto' }}>
-              <Campo label="Produto">
-                <Combobox
-                  items={produtos}
-                  value={it.produtoId}
-                  onChange={(id) => setItem(i, 'produtoId', id)}
-                  getId={(p) => p.id}
-                  getPrimary={(p) => `${p.sku} — ${p.nome}`}
-                  getSecondary={(p) => p.controlaLote ? 'controla lote' : p.unidadeMedida}
-                  termos={(p) => [p.sku, p.nome, p.codigoBarras].filter(Boolean).join(' ')}
-                  placeholder="Buscar produto…"
-                />
-              </Campo>
-              <Campo label="Qtd. nota">
-                <input type="number" step="0.001" min="0" value={it.quantidadeDeclarada}
-                       onChange={(e) => {
-                         setItem(i, 'quantidadeDeclarada', e.target.value)
-                         if (it.quantidadeRecebida === '' || it.quantidadeRecebida === it.quantidadeDeclarada) {
-                           setItem(i, 'quantidadeRecebida', e.target.value)
-                         }
-                       }} />
-              </Campo>
-              <Campo label="Qtd. recebida">
-                <input type="number" step="0.001" min="0" value={it.quantidadeRecebida}
-                       onChange={(e) => setItem(i, 'quantidadeRecebida', e.target.value)} />
-              </Campo>
-              <Campo label="Vlr. unit.">
-                <input type="number" step="0.01" min="0" value={it.valorUnitario}
-                       onChange={(e) => setItem(i, 'valorUnitario', e.target.value)} />
-              </Campo>
-              {controla && (
-                <Campo label="Lote">
-                  <input value={it.loteCodigo} onChange={(e) => setItem(i, 'loteCodigo', e.target.value)} />
-                </Campo>
-              )}
-              {controla && (
-                <Campo label="Validade">
-                  <input type="date" value={it.dataValidade} onChange={(e) => setItem(i, 'dataValidade', e.target.value)} />
-                </Campo>
-              )}
-              <button type="button" className="linha-remover" title="Remover"
-                      onClick={() => setItens((a) => a.filter((_, idx) => idx !== i))}
-                      disabled={itens.length === 1}>✕</button>
-            </div>
-          )
-        })}
-        <button type="button" className="add-linha" onClick={() => setItens((a) => [...a, itemVazio()])}>
-          + Adicionar item
-        </button>
-      </div>
+      <Card withBorder padding="lg">
+        <Title order={4} mb="md">Total e pagamento</Title>
+        <Group gap="xl">
+          <Stat label="Soma dos itens" value={brl(somaItens)} />
+          <Stat label="+ Frete − Desconto" value={brl(totalSugerido)} />
+          <Group gap="xs" align="flex-end">
+            <NumberInput label="Total da nota" withAsterisk min={0} decimalScale={2} prefix="R$ " w={160}
+                         value={nota.valorTotal} onChange={setN('valorTotal')} />
+            <Button variant="light" size="sm"
+                    onClick={() => setN('valorTotal')(totalSugerido)}>usar {brl(totalSugerido)}</Button>
+          </Group>
+        </Group>
 
-      <div className="card">
-        <h2>Total e pagamento</h2>
-        <div className="totais">
-          <div className="item"><div className="rot">Soma dos itens</div><div className="val">{brl(somaItens)}</div></div>
-          <div className="item"><div className="rot">+ Frete − Desconto</div><div className="val">{brl(totalSugerido)}</div></div>
-          <div className="item">
-            <div className="rot">Total da nota</div>
-            <div className="val">
-              <input type="number" step="0.01" min="0" style={{ width: 130 }}
-                     value={nota.valorTotal} onChange={setN('valorTotal')} required />
-              <button type="button" className="add-linha" style={{ marginLeft: 8 }}
-                      onClick={() => setNota({ ...nota, valorTotal: String(totalSugerido) })}>
-                usar {brl(totalSugerido)}
-              </button>
-            </div>
-          </div>
-        </div>
+        <Divider my="lg" label="Duplicatas (parcelas a pagar)" labelPosition="left" />
+        <Stack gap="xs">
+          {duplicatas.map((d, i) => (
+            <Group key={i} align="flex-end" wrap="nowrap">
+              <Group grow align="flex-end" style={{ flex: 1 }}>
+                <TextInput label="Número" value={d.numero}
+                           onChange={(e) => setDuplicatas((a) => a.map((x, idx) => idx === i ? { ...x, numero: e.currentTarget.value } : x))} />
+                <TextInput label="Vencimento" type="date" value={d.vencimento}
+                           onChange={(e) => setDuplicatas((a) => a.map((x, idx) => idx === i ? { ...x, vencimento: e.currentTarget.value } : x))} />
+                <NumberInput label="Valor" min={0} decimalScale={2} prefix="R$ " value={d.valor}
+                             onChange={(v) => setDuplicatas((a) => a.map((x, idx) => idx === i ? { ...x, valor: v } : x))} />
+              </Group>
+              <ActionIcon variant="subtle" color="red" mb={4} disabled={duplicatas.length === 1}
+                          onClick={() => setDuplicatas((a) => a.filter((_, idx) => idx !== i))}>✕</ActionIcon>
+            </Group>
+          ))}
+        </Stack>
+        <Button variant="light" size="xs" mt="sm"
+                onClick={() => setDuplicatas((a) => [...a, dupVazia()])}>+ Adicionar parcela</Button>
 
-        <div className="secao-titulo">Duplicatas (parcelas a pagar)</div>
-        {duplicatas.map((d, i) => (
-          <div key={i} className="linha-item" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-            <Campo label="Número">
-              <input value={d.numero}
-                     onChange={(e) => setDuplicatas((a) => a.map((x, idx) => idx === i ? { ...x, numero: e.target.value } : x))} />
-            </Campo>
-            <Campo label="Vencimento">
-              <input type="date" value={d.vencimento}
-                     onChange={(e) => setDuplicatas((a) => a.map((x, idx) => idx === i ? { ...x, vencimento: e.target.value } : x))} />
-            </Campo>
-            <Campo label="Valor">
-              <input type="number" step="0.01" min="0" value={d.valor}
-                     onChange={(e) => setDuplicatas((a) => a.map((x, idx) => idx === i ? { ...x, valor: e.target.value } : x))} />
-            </Campo>
-            <button type="button" className="linha-remover"
-                    onClick={() => setDuplicatas((a) => a.filter((_, idx) => idx !== i))}
-                    disabled={duplicatas.length === 1}>✕</button>
-          </div>
-        ))}
-        <button type="button" className="add-linha" onClick={() => setDuplicatas((a) => [...a, dupVazia()])}>
-          + Adicionar parcela
-        </button>
+        <Group gap="xl" mt="lg">
+          <Stat label="Soma das parcelas" value={brl(somaDuplicatas)} />
+          <Stat label="Não cobrado (bonificação/desconto)" value={brl(naoCobrado)} />
+          <Stat label="Situação"
+                value={!duplicatasValidas ? '✗ parcelas passam do total'
+                  : naoCobrado > 0 ? '✓ com bonificação/desconto' : '✓ ok'}
+                color={duplicatasValidas ? 'green' : 'red'} />
+        </Group>
+      </Card>
 
-        <div className="totais" style={{ marginTop: 16 }}>
-          <div className="item"><div className="rot">Soma das parcelas</div><div className="val">{brl(somaDuplicatas)}</div></div>
-          <div className="item">
-            <div className="rot">Não cobrado (bonificação/desconto)</div>
-            <div className="val">{brl(naoCobrado)}</div>
-          </div>
-          <div className="item">
-            <div className="rot">Situação</div>
-            <div className={'val ' + (duplicatasValidas ? 'ok' : 'nok')}>
-              {!duplicatasValidas
-                ? '✗ parcelas passam do total'
-                : naoCobrado > 0 ? '✓ com bonificação/desconto' : '✓ ok'}
-            </div>
-          </div>
-        </div>
-      </div>
+      <Group>
+        <Button size="md" loading={enviando} onClick={enviar}>Registrar entrada</Button>
+      </Group>
+    </Stack>
+  )
+}
 
-      <div className="acoes-form">
-        <button className="btn" disabled={enviando}>
-          {enviando ? 'Registrando…' : 'Registrar entrada'}
-        </button>
-      </div>
-    </form>
+function Stat({ label, value, color }) {
+  return (
+    <Stack gap={0}>
+      <Text size="xs" c="dimmed" tt="uppercase" fw={600}>{label}</Text>
+      <Text fw={600} c={color}>{value}</Text>
+    </Stack>
   )
 }

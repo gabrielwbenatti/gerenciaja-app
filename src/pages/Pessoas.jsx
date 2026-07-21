@@ -1,171 +1,166 @@
 import { useEffect, useState } from 'react'
+import {
+  Table, Button, Modal, TextInput, Select, Chip, Group, Stack, Badge,
+  Card, Text, Loader, Center,
+} from '@mantine/core'
+import { useForm } from '@mantine/form'
+import { useDisclosure } from '@mantine/hooks'
+import { notifications } from '@mantine/notifications'
 import { api } from '../api'
-import { Campo, Alerta, PaginaTopo } from '../ui'
+import { PageHeader } from '../components/PageHeader'
 import { maskDocument, formatDocument, limparDocumento } from '../lib/format'
 
 const PAPEIS = ['CLIENTE', 'FORNECEDOR', 'TRANSPORTADORA', 'VENDEDOR']
 
-const FORM_VAZIO = {
-  tipo: 'PJ', documento: '', nome: '', nomeFantasia: '',
-  papeis: ['CLIENTE'], email: '', telefone: '',
-}
-
 export default function Pessoas() {
   const [lista, setLista] = useState(null)
-  const [erroLista, setErroLista] = useState(null)
-  const [criando, setCriando] = useState(false)
+  const [erro, setErro] = useState(null)
+  const [aberto, { open, close }] = useDisclosure(false)
 
   async function carregar() {
-    setErroLista(null)
+    setErro(null)
     try {
       setLista(await api.get('/pessoas'))
     } catch (err) {
-      setErroLista(err.message)
+      setErro(err.message)
     }
   }
 
   useEffect(() => { carregar() }, [])
 
   return (
-    <>
-      <PaginaTopo titulo="Pessoas" descricao="Clientes, fornecedores e demais contatos">
-        <button className="btn" onClick={() => setCriando(true)}>Nova pessoa</button>
-      </PaginaTopo>
+    <Stack>
+      <PageHeader
+        title="Pessoas"
+        subtitle="Clientes, fornecedores e demais contatos"
+        action={<Button onClick={open}>Nova pessoa</Button>}
+      />
 
-      {criando && (
-        <FormPessoa
-          aoSalvar={() => { setCriando(false); carregar() }}
-          aoCancelar={() => setCriando(false)}
-        />
-      )}
-
-      <div className="card">
-        <Alerta tipo="erro">{erroLista}</Alerta>
-        {lista === null && !erroLista && <div className="carregando">Carregando…</div>}
-        {lista && lista.length === 0 && <div className="vazio">Nenhuma pessoa cadastrada ainda.</div>}
-        {lista && lista.length > 0 && (
-          <div className="tabela-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nome</th><th>Tipo</th><th>Documento</th><th>Papéis</th><th>Contato</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lista.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.nome}{p.nomeFantasia && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{p.nomeFantasia}</div>}</td>
-                    <td>{p.tipo}</td>
-                    <td>{formatDocument(p.documento)}</td>
-                    <td>{p.papeis.map((pp) => <span key={pp} className="tag">{pp}</span>)}</td>
-                    <td>{p.email || p.telefone || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <Card withBorder padding={0}>
+        {erro && <Text c="red" p="md">{erro}</Text>}
+        {lista === null && !erro && <Center p="xl"><Loader /></Center>}
+        {lista && lista.length === 0 && (
+          <Text c="dimmed" ta="center" p="xl">Nenhuma pessoa cadastrada ainda.</Text>
         )}
-      </div>
-    </>
+        {lista && lista.length > 0 && (
+          <Table.ScrollContainer minWidth={700}>
+            <Table highlightOnHover verticalSpacing="sm">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Nome</Table.Th><Table.Th>Tipo</Table.Th>
+                  <Table.Th>Documento</Table.Th><Table.Th>Papéis</Table.Th>
+                  <Table.Th>Contato</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {lista.map((p) => (
+                  <Table.Tr key={p.id}>
+                    <Table.Td>
+                      <Text fw={500}>{p.nome}</Text>
+                      {p.nomeFantasia && <Text size="sm" c="dimmed">{p.nomeFantasia}</Text>}
+                    </Table.Td>
+                    <Table.Td>{p.tipo}</Table.Td>
+                    <Table.Td>{formatDocument(p.documento)}</Table.Td>
+                    <Table.Td>
+                      <Group gap={4}>
+                        {p.papeis.map((pp) => <Badge key={pp} variant="light" size="sm">{pp}</Badge>)}
+                      </Group>
+                    </Table.Td>
+                    <Table.Td>{p.email || p.telefone || '—'}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
+        )}
+      </Card>
+
+      <Modal opened={aberto} onClose={close} title="Nova pessoa" size="lg">
+        <FormPessoa aoSalvar={() => { close(); carregar() }} />
+      </Modal>
+    </Stack>
   )
 }
 
-function FormPessoa({ aoSalvar, aoCancelar }) {
-  const [form, setForm] = useState(FORM_VAZIO)
-  const [erro, setErro] = useState(null)
+function FormPessoa({ aoSalvar }) {
   const [enviando, setEnviando] = useState(false)
 
-  const set = (campo) => (e) => setForm({ ...form, [campo]: e.target.value })
+  const form = useForm({
+    initialValues: {
+      tipo: 'PJ', documento: '', nome: '', nomeFantasia: '',
+      papeis: ['CLIENTE'], email: '', telefone: '',
+    },
+    validate: {
+      documento: (v, values) => {
+        const n = limparDocumento(v).length
+        const esperado = values.tipo === 'PF' ? 11 : 14
+        return n === esperado ? null : `${values.tipo === 'PF' ? 'CPF' : 'CNPJ'} incompleto`
+      },
+      nome: (v) => (v.trim() ? null : 'Informe o nome'),
+      papeis: (v) => (v.length ? null : 'Selecione ao menos um papel'),
+    },
+  })
 
-  // Máscara na digitação + detecção de PF/PJ pelo tamanho: 11 = CPF (PF),
-  // 12+ = CNPJ (PJ). Abaixo de 11 mantém o tipo atual (não fica trocando a cada
-  // tecla). O seletor manual continua sobrepondo quando o usuário escolhe.
+  // Máscara + detecção de PF/PJ pelo tamanho (o Select ainda permite ajuste manual).
   function onDocumento(e) {
-    const mascarado = maskDocument(e.target.value)
+    const mascarado = maskDocument(e.currentTarget.value)
     const qtd = limparDocumento(mascarado).length
-    setForm((f) => ({
-      ...f,
-      documento: mascarado,
-      tipo: qtd >= 12 ? 'PJ' : qtd === 11 ? 'PF' : f.tipo,
-    }))
+    form.setFieldValue('documento', mascarado)
+    if (qtd >= 12) form.setFieldValue('tipo', 'PJ')
+    else if (qtd === 11) form.setFieldValue('tipo', 'PF')
   }
 
-  function togglePapel(papel) {
-    setForm((f) => ({
-      ...f,
-      papeis: f.papeis.includes(papel)
-        ? f.papeis.filter((x) => x !== papel)
-        : [...f.papeis, papel],
-    }))
-  }
-
-  async function enviar(e) {
-    e.preventDefault()
-    setErro(null)
-    if (form.papeis.length === 0) { setErro('Selecione ao menos um papel.'); return }
+  async function enviar(values) {
     setEnviando(true)
     try {
-      const corpo = { ...form }
+      const corpo = { ...values }
       if (!corpo.email) delete corpo.email
       await api.post('/pessoas', corpo)
+      notifications.show({ color: 'green', message: `${values.nome} cadastrado(a).` })
       aoSalvar()
     } catch (err) {
-      setErro(err.message)
+      notifications.show({ color: 'red', title: 'Erro ao salvar', message: err.message })
     } finally {
       setEnviando(false)
     }
   }
 
   return (
-    <div className="card">
-      <h2>Nova pessoa</h2>
-      <Alerta tipo="erro">{erro}</Alerta>
-      <form onSubmit={enviar}>
-        <div className="form-grid">
-          <Campo label="CPF / CNPJ" req
-                 ajuda="Digite o documento — o tipo se ajusta sozinho">
-            <input value={form.documento} onChange={onDocumento}
-                   placeholder="CPF (11 dígitos) ou CNPJ (14)" required autoFocus />
-          </Campo>
-          <Campo label="Tipo" ajuda="Detectado pelo documento; pode ajustar manualmente">
-            <select value={form.tipo} onChange={set('tipo')}>
-              <option value="PJ">Pessoa Jurídica</option>
-              <option value="PF">Pessoa Física</option>
-            </select>
-          </Campo>
-          <Campo label="Nome / Razão social" req full>
-            <input value={form.nome} onChange={set('nome')} required />
-          </Campo>
-          <Campo label="Nome fantasia">
-            <input value={form.nomeFantasia} onChange={set('nomeFantasia')} />
-          </Campo>
-          <Campo label="E-mail">
-            <input type="email" value={form.email} onChange={set('email')} />
-          </Campo>
-          <Campo label="Telefone">
-            <input value={form.telefone} onChange={set('telefone')} />
-          </Campo>
-          <Campo label="Papéis" req full ajuda="Uma pessoa pode ter mais de um">
-            <div className="chips">
-              {PAPEIS.map((p) => (
-                <span key={p}
-                      className={'chip' + (form.papeis.includes(p) ? ' sel' : '')}
-                      onClick={() => togglePapel(p)}>
-                  {p}
-                </span>
-              ))}
-            </div>
-          </Campo>
+    <form onSubmit={form.onSubmit(enviar)}>
+      <Stack>
+        <Group grow align="flex-start">
+          <TextInput label="CPF / CNPJ" withAsterisk data-autofocus
+                     placeholder="CPF (11 dígitos) ou CNPJ (14)"
+                     description="O tipo se ajusta sozinho"
+                     value={form.values.documento} onChange={onDocumento}
+                     error={form.errors.documento} />
+          <Select label="Tipo" data={[
+                    { value: 'PJ', label: 'Pessoa Jurídica' },
+                    { value: 'PF', label: 'Pessoa Física' },
+                  ]} allowDeselect={false} {...form.getInputProps('tipo')} />
+        </Group>
+        <TextInput label="Nome / Razão social" withAsterisk {...form.getInputProps('nome')} />
+        <Group grow>
+          <TextInput label="Nome fantasia" {...form.getInputProps('nomeFantasia')} />
+          <TextInput label="E-mail" type="email" {...form.getInputProps('email')} />
+        </Group>
+        <TextInput label="Telefone" {...form.getInputProps('telefone')} />
+
+        <div>
+          <Text size="sm" fw={500} mb={4}>Papéis <Text span c="red">*</Text></Text>
+          <Chip.Group multiple value={form.values.papeis}
+                      onChange={(v) => form.setFieldValue('papeis', v)}>
+            <Group gap="xs">
+              {PAPEIS.map((p) => <Chip key={p} value={p}>{p}</Chip>)}
+            </Group>
+          </Chip.Group>
+          {form.errors.papeis && <Text c="red" size="xs" mt={4}>{form.errors.papeis}</Text>}
         </div>
-        <div className="acoes-form">
-          <button className="btn" disabled={enviando}>
-            {enviando ? 'Salvando…' : 'Salvar'}
-          </button>
-          <button type="button" className="btn btn-secundario" onClick={aoCancelar}>
-            Cancelar
-          </button>
-        </div>
-      </form>
-    </div>
+
+        <Group justify="flex-end" mt="sm">
+          <Button type="submit" loading={enviando}>Salvar</Button>
+        </Group>
+      </Stack>
+    </form>
   )
 }

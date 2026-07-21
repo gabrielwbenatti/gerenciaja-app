@@ -1,21 +1,23 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Table, Badge, Card, Text, Loader, Center, Stack, Alert } from '@mantine/core'
 import { api } from '../api'
-import { Alerta, PaginaTopo } from '../ui'
+import { PageHeader } from '../components/PageHeader'
 
 const brl = (v) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
 const data = (iso) => (iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : '—')
 
+const STATUS = {
+  ESCRITURADA: { color: 'green', label: 'Escriturada' },
+  DIGITADA: { color: 'gray', label: 'Digitada' },
+  CONFERIDA: { color: 'blue', label: 'Conferida' },
+  CANCELADA: { color: 'red', label: 'Cancelada' },
+}
+
 export function statusNota(status) {
-  const cores = {
-    ESCRITURADA: { color: 'var(--success)', borderColor: '#bbf7d0' },
-    DIGITADA: { color: 'var(--muted)' },
-    CONFERIDA: { color: 'var(--primary)', borderColor: '#bfdbfe' },
-    CANCELADA: { color: 'var(--danger)', borderColor: '#fecaca' },
-  }
-  const label = { ESCRITURADA: 'Escriturada', DIGITADA: 'Digitada', CONFERIDA: 'Conferida', CANCELADA: 'Cancelada' }
-  return <span className="tag" style={cores[status] || {}}>{label[status] || status}</span>
+  const s = STATUS[status] || { color: 'gray', label: status }
+  return <Badge color={s.color} variant="light">{s.label}</Badge>
 }
 
 export default function NotasEntrada() {
@@ -28,43 +30,43 @@ export default function NotasEntrada() {
   }, [])
 
   return (
-    <>
-      <PaginaTopo titulo="Notas de entrada" descricao="Notas fiscais de compra lançadas" />
-      <div className="card">
-        <Alerta tipo="erro">{erro}</Alerta>
-        {notas === null && !erro && <div className="carregando">Carregando…</div>}
+    <Stack>
+      <PageHeader title="Notas de entrada" subtitle="Notas fiscais de compra lançadas" />
+      <Card withBorder padding={0}>
+        {erro && <Alert color="red" m="md">{erro}</Alert>}
+        {notas === null && !erro && <Center p="xl"><Loader /></Center>}
         {notas && notas.length === 0 && (
-          <div className="vazio">Nenhuma nota lançada. Use “Entrada de mercadoria” para lançar a primeira.</div>
+          <Text c="dimmed" ta="center" p="xl">
+            Nenhuma nota lançada. Use “Entrada de mercadoria” para lançar a primeira.
+          </Text>
         )}
         {notas && notas.length > 0 && (
-          <div className="tabela-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nº / Série</th><th>Fornecedor</th>
-                  <th>Emissão</th><th>Entrada</th>
-                  <th style={{ textAlign: 'right' }}>Valor</th>
-                  <th>Situação</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
+          <Table.ScrollContainer minWidth={720}>
+            <Table highlightOnHover verticalSpacing="sm">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Nº / Série</Table.Th><Table.Th>Fornecedor</Table.Th>
+                  <Table.Th>Emissão</Table.Th><Table.Th>Entrada</Table.Th>
+                  <Table.Th ta="right">Valor</Table.Th><Table.Th>Situação</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {notas.map((n) => (
-                  <tr key={n.id} style={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/notas/${n.id}`)} title="Ver detalhes">
-                    <td>{n.numero}<span style={{ color: 'var(--muted)' }}> / {n.serie}</span></td>
-                    <td>{n.fornecedor}</td>
-                    <td>{data(n.dataEmissao)}</td>
-                    <td>{data(n.dataEntrada)}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{brl(n.valorTotal)}</td>
-                    <td>{statusNota(n.status)}</td>
-                    <td><span className="btn-linha">Detalhes →</span></td>
-                  </tr>
+                  <Table.Tr key={n.id} style={{ cursor: 'pointer' }}
+                            onClick={() => navigate(`/notas/${n.id}`)}>
+                    <Table.Td>{n.numero} <Text span c="dimmed">/ {n.serie}</Text></Table.Td>
+                    <Table.Td>{n.fornecedor}</Table.Td>
+                    <Table.Td>{data(n.dataEmissao)}</Table.Td>
+                    <Table.Td>{data(n.dataEntrada)}</Table.Td>
+                    <Table.Td ta="right" fw={600}>{brl(n.valorTotal)}</Table.Td>
+                    <Table.Td>{statusNota(n.status)}</Table.Td>
+                  </Table.Tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         )}
-      </div>
-    </>
+      </Card>
+    </Stack>
   )
 }

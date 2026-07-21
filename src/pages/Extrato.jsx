@@ -1,24 +1,22 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
+import { Table, Text, Card, Loader, Center, Stack, Alert, Button } from '@mantine/core'
 import { api } from '../api'
-import { Alerta, PaginaTopo } from '../ui'
+import { PageHeader } from '../components/PageHeader'
 
 const qtd = (v) =>
   new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(v ?? 0)
 const brl = (v) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
-
 const dataHora = (iso) =>
   new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 
-// origem_tipo -> rótulo legível
 function origem(tipo, id) {
   if (!tipo) return '—'
   const rotulos = { NF_ENTRADA: 'NF entrada', VENDA: 'Venda', AJUSTE: 'Ajuste', TRANSFERENCIA: 'Transferência' }
   return `${rotulos[tipo] || tipo}${id ? ' #' + id : ''}`
 }
 
-// Cada tipo de movimento tem uma cor de sinal
 const TIPO_LABEL = {
   COMPRA: 'Compra', VENDA: 'Venda', AJUSTE: 'Ajuste',
   DEVOLUCAO_CLIENTE: 'Devol. cliente', DEVOLUCAO_FORNECEDOR: 'Devol. fornecedor',
@@ -27,6 +25,7 @@ const TIPO_LABEL = {
 
 export default function Extrato() {
   const { produtoId } = useParams()
+  const navigate = useNavigate()
   const [produto, setProduto] = useState(null)
   const [linhas, setLinhas] = useState(null)
   const [erro, setErro] = useState(null)
@@ -44,56 +43,58 @@ export default function Extrato() {
   const saldoAtual = linhas && linhas.length > 0 ? linhas[linhas.length - 1].saldoAcumulado : 0
 
   return (
-    <>
-      <PaginaTopo
-        titulo={produto ? `Extrato — ${produto.nome}` : 'Extrato'}
-        descricao={produto ? `SKU ${produto.sku} · saldo atual ${qtd(saldoAtual)} ${produto.unidadeMedida}` : ''}>
-        <Link to="/estoque" className="btn btn-secundario">← Voltar ao estoque</Link>
-      </PaginaTopo>
+    <Stack>
+      <PageHeader
+        title={produto ? `Extrato — ${produto.nome}` : 'Extrato'}
+        subtitle={produto ? `SKU ${produto.sku} · saldo atual ${qtd(saldoAtual)} ${produto.unidadeMedida}` : ''}
+        action={<Button variant="default" onClick={() => navigate('/estoque')}>← Voltar ao estoque</Button>}
+      />
 
-      <div className="card">
-        <Alerta tipo="erro">{erro}</Alerta>
-        {linhas === null && !erro && <div className="carregando">Carregando…</div>}
-        {linhas && linhas.length === 0 && (
-          <div className="vazio">Nenhum movimento — este produto ainda não teve entradas nem saídas.</div>
-        )}
-        {linhas && linhas.length > 0 && (
-          <div className="tabela-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Data</th><th>Tipo</th><th>Lote</th><th>Depósito</th>
-                  <th style={{ textAlign: 'right' }}>Quantidade</th>
-                  <th style={{ textAlign: 'right' }}>Custo unit.</th>
-                  <th>Origem</th>
-                  <th style={{ textAlign: 'right' }}>Saldo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {linhas.map((m, i) => {
-                  const entrada = Number(m.quantidade) >= 0
-                  return (
-                    <tr key={i}>
-                      <td style={{ whiteSpace: 'nowrap' }}>{dataHora(m.dataMovimento)}</td>
-                      <td>{TIPO_LABEL[m.tipo] || m.tipo}</td>
-                      <td>{m.loteCodigo === 'SINTETICO'
-                        ? <span style={{ color: 'var(--muted)' }}>—</span>
-                        : m.loteCodigo}</td>
-                      <td>{m.depositoNome}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600, color: entrada ? 'var(--success)' : 'var(--danger)' }}>
-                        {entrada ? '+' : ''}{qtd(m.quantidade)}
-                      </td>
-                      <td style={{ textAlign: 'right', color: 'var(--muted)' }}>{brl(m.custoUnitario)}</td>
-                      <td>{origem(m.origemTipo, m.origemId)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{qtd(m.saldoAcumulado)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </>
+      {erro && <Alert color="red">{erro}</Alert>}
+      {linhas === null && !erro && <Center p="xl"><Loader /></Center>}
+
+      {linhas && (
+        <Card withBorder padding={0}>
+          {linhas.length === 0 && (
+            <Text c="dimmed" ta="center" p="xl">
+              Nenhum movimento — este produto ainda não teve entradas nem saídas.
+            </Text>
+          )}
+          {linhas.length > 0 && (
+            <Table.ScrollContainer minWidth={820}>
+              <Table verticalSpacing="sm">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Data</Table.Th><Table.Th>Tipo</Table.Th><Table.Th>Lote</Table.Th>
+                    <Table.Th>Depósito</Table.Th><Table.Th ta="right">Quantidade</Table.Th>
+                    <Table.Th ta="right">Custo unit.</Table.Th><Table.Th>Origem</Table.Th>
+                    <Table.Th ta="right">Saldo</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {linhas.map((m, i) => {
+                    const entrada = Number(m.quantidade) >= 0
+                    return (
+                      <Table.Tr key={i}>
+                        <Table.Td style={{ whiteSpace: 'nowrap' }}>{dataHora(m.dataMovimento)}</Table.Td>
+                        <Table.Td>{TIPO_LABEL[m.tipo] || m.tipo}</Table.Td>
+                        <Table.Td>{m.loteCodigo === 'SINTETICO' ? <Text c="dimmed">—</Text> : m.loteCodigo}</Table.Td>
+                        <Table.Td>{m.depositoNome}</Table.Td>
+                        <Table.Td ta="right" fw={600} c={entrada ? 'green' : 'red'}>
+                          {entrada ? '+' : ''}{qtd(m.quantidade)}
+                        </Table.Td>
+                        <Table.Td ta="right" c="dimmed">{brl(m.custoUnitario)}</Table.Td>
+                        <Table.Td>{origem(m.origemTipo, m.origemId)}</Table.Td>
+                        <Table.Td ta="right" fw={600}>{qtd(m.saldoAcumulado)}</Table.Td>
+                      </Table.Tr>
+                    )
+                  })}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
+          )}
+        </Card>
+      )}
+    </Stack>
   )
 }

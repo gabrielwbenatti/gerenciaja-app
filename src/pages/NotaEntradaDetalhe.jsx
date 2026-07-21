@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
+import {
+  Card, Title, Text, Table, Badge, Button, SimpleGrid, Group, Stack, Loader, Center, Alert,
+} from '@mantine/core'
 import { api } from '../api'
-import { Alerta, PaginaTopo } from '../ui'
+import { PageHeader } from '../components/PageHeader'
 import { statusNota } from './NotasEntrada'
 import { formatDocument } from '../lib/format'
 
@@ -11,17 +14,18 @@ const qtd = (v) =>
   new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(v ?? 0)
 const data = (iso) => (iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : '—')
 
-function Campo({ rotulo, children }) {
+function Info({ label, children }) {
   return (
     <div>
-      <div style={{ color: 'var(--muted)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{rotulo}</div>
-      <div style={{ fontWeight: 500 }}>{children}</div>
+      <Text size="xs" c="dimmed" tt="uppercase" fw={600}>{label}</Text>
+      <Text fw={500}>{children}</Text>
     </div>
   )
 }
 
 export default function NotaEntradaDetalhe() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [nota, setNota] = useState(null)
   const [erro, setErro] = useState(null)
 
@@ -31,103 +35,105 @@ export default function NotaEntradaDetalhe() {
   }, [id])
 
   return (
-    <>
-      <PaginaTopo
-        titulo={nota ? `Nota ${nota.numero} / ${nota.serie}` : 'Nota de entrada'}
-        descricao={nota ? nota.fornecedor : ''}>
-        <Link to="/notas" className="btn btn-secundario">← Voltar</Link>
-      </PaginaTopo>
+    <Stack>
+      <PageHeader
+        title={nota ? `Nota ${nota.numero} / ${nota.serie}` : 'Nota de entrada'}
+        subtitle={nota ? nota.fornecedor : ''}
+        action={<Button variant="default" onClick={() => navigate('/notas')}>← Voltar</Button>}
+      />
 
-      <Alerta tipo="erro">{erro}</Alerta>
-      {nota === null && !erro && <div className="carregando">Carregando…</div>}
+      {erro && <Alert color="red">{erro}</Alert>}
+      {nota === null && !erro && <Center p="xl"><Loader /></Center>}
 
       {nota && (
         <>
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h2 style={{ margin: 0 }}>Dados da nota</h2>
+          <Card withBorder padding="lg">
+            <Group justify="space-between" mb="md">
+              <Title order={4}>Dados da nota</Title>
               {statusNota(nota.status)}
-            </div>
-            <div className="form-grid">
-              <Campo rotulo="Fornecedor">{nota.fornecedor}</Campo>
-              <Campo rotulo="Documento">{formatDocument(nota.fornecedorDocumento)}</Campo>
-              <Campo rotulo="Modelo / Série / Número">{nota.modelo} · {nota.serie} · {nota.numero}</Campo>
-              <Campo rotulo="Natureza da operação">{nota.naturezaOperacao || '—'}</Campo>
-              <Campo rotulo="Emissão">{data(nota.dataEmissao)}</Campo>
-              <Campo rotulo="Entrada">{data(nota.dataEntrada)}</Campo>
-              <Campo rotulo="Chave de acesso">{nota.chaveAcesso || '—'}</Campo>
-            </div>
-          </div>
+            </Group>
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+              <Info label="Fornecedor">{nota.fornecedor}</Info>
+              <Info label="Documento">{formatDocument(nota.fornecedorDocumento)}</Info>
+              <Info label="Modelo / Série / Número">{nota.modelo} · {nota.serie} · {nota.numero}</Info>
+              <Info label="Natureza da operação">{nota.naturezaOperacao || '—'}</Info>
+              <Info label="Emissão">{data(nota.dataEmissao)}</Info>
+              <Info label="Entrada">{data(nota.dataEntrada)}</Info>
+              <Info label="Chave de acesso">{nota.chaveAcesso || '—'}</Info>
+            </SimpleGrid>
+          </Card>
 
-          <div className="card">
-            <h2>Itens</h2>
-            <div className="tabela-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th><th>SKU</th><th>Produto</th><th>Cód. fornecedor</th>
-                    <th style={{ textAlign: 'right' }}>Qtd.</th>
-                    <th style={{ textAlign: 'right' }}>Vlr. unit.</th>
-                    <th style={{ textAlign: 'right' }}>Total</th>
-                    <th style={{ textAlign: 'right' }}>Custo aquis.</th>
-                  </tr>
-                </thead>
-                <tbody>
+          <Card withBorder padding="lg">
+            <Title order={4} mb="md">Itens</Title>
+            <Table.ScrollContainer minWidth={760}>
+              <Table verticalSpacing="sm">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>#</Table.Th><Table.Th>SKU</Table.Th><Table.Th>Produto</Table.Th>
+                    <Table.Th>Cód. forn.</Table.Th><Table.Th ta="right">Qtd.</Table.Th>
+                    <Table.Th ta="right">Vlr. unit.</Table.Th><Table.Th ta="right">Total</Table.Th>
+                    <Table.Th ta="right">Custo aquis.</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
                   {nota.itens.map((it) => (
-                    <tr key={it.numero}>
-                      <td>{it.numero}</td>
-                      <td>{it.sku}</td>
-                      <td>{it.produto}</td>
-                      <td style={{ color: 'var(--muted)' }}>{it.codigoNoFornecedor || '—'}</td>
-                      <td style={{ textAlign: 'right' }}>{qtd(it.quantidade)} {it.unidade}</td>
-                      <td style={{ textAlign: 'right' }}>{brl(it.valorUnitario)}</td>
-                      <td style={{ textAlign: 'right' }}>{brl(it.valorTotal)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{brl(it.custoAquisicaoUnitario)}</td>
-                    </tr>
+                    <Table.Tr key={it.numero}>
+                      <Table.Td>{it.numero}</Table.Td>
+                      <Table.Td>{it.sku}</Table.Td>
+                      <Table.Td>{it.produto}</Table.Td>
+                      <Table.Td c="dimmed">{it.codigoNoFornecedor || '—'}</Table.Td>
+                      <Table.Td ta="right">{qtd(it.quantidade)} {it.unidade}</Table.Td>
+                      <Table.Td ta="right">{brl(it.valorUnitario)}</Table.Td>
+                      <Table.Td ta="right">{brl(it.valorTotal)}</Table.Td>
+                      <Table.Td ta="right" fw={600}>{brl(it.custoAquisicaoUnitario)}</Table.Td>
+                    </Table.Tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="totais" style={{ marginTop: 16 }}>
-              <div className="item"><div className="rot">Produtos</div><div className="val">{brl(nota.valorProdutos)}</div></div>
-              <div className="item"><div className="rot">Frete</div><div className="val">{brl(nota.valorFrete)}</div></div>
-              <div className="item"><div className="rot">Desconto</div><div className="val">{brl(nota.valorDesconto)}</div></div>
-              <div className="item"><div className="rot">Total da nota</div><div className="val" style={{ color: 'var(--primary)' }}>{brl(nota.valorTotal)}</div></div>
-            </div>
-          </div>
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
+            <Group gap="xl" mt="md">
+              <Info label="Produtos">{brl(nota.valorProdutos)}</Info>
+              <Info label="Frete">{brl(nota.valorFrete)}</Info>
+              <Info label="Desconto">{brl(nota.valorDesconto)}</Info>
+              <div>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Total da nota</Text>
+                <Text fw={700} c="blue">{brl(nota.valorTotal)}</Text>
+              </div>
+            </Group>
+          </Card>
 
-          <div className="card">
-            <h2>Contas a pagar geradas</h2>
+          <Card withBorder padding="lg">
+            <Title order={4} mb="md">Contas a pagar geradas</Title>
             {nota.contas.length === 0
-              ? <div className="vazio">Sem parcelas (compra à vista ou totalmente bonificada).</div>
+              ? <Text c="dimmed">Sem parcelas (compra à vista ou totalmente bonificada).</Text>
               : (
-                <div className="tabela-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Duplicata</th><th>Parcela</th><th>Vencimento</th>
-                        <th style={{ textAlign: 'right' }}>Valor</th>
-                        <th style={{ textAlign: 'right' }}>Pago</th><th>Situação</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                <Table.ScrollContainer minWidth={600}>
+                  <Table verticalSpacing="sm">
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Duplicata</Table.Th><Table.Th>Parcela</Table.Th>
+                        <Table.Th>Vencimento</Table.Th><Table.Th ta="right">Valor</Table.Th>
+                        <Table.Th ta="right">Pago</Table.Th><Table.Th>Situação</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
                       {nota.contas.map((c) => (
-                        <tr key={c.id}>
-                          <td>{c.numeroDuplicata || '—'}</td>
-                          <td>{c.parcela}/{c.totalParcelas}</td>
-                          <td>{data(c.vencimento)}</td>
-                          <td style={{ textAlign: 'right', fontWeight: 600 }}>{brl(c.valor)}</td>
-                          <td style={{ textAlign: 'right', color: 'var(--muted)' }}>{brl(c.valorPago)}</td>
-                          <td><span className="tag">{c.status}</span></td>
-                        </tr>
+                        <Table.Tr key={c.id}>
+                          <Table.Td>{c.numeroDuplicata || '—'}</Table.Td>
+                          <Table.Td>{c.parcela}/{c.totalParcelas}</Table.Td>
+                          <Table.Td>{data(c.vencimento)}</Table.Td>
+                          <Table.Td ta="right" fw={600}>{brl(c.valor)}</Table.Td>
+                          <Table.Td ta="right" c="dimmed">{brl(c.valorPago)}</Table.Td>
+                          <Table.Td><Badge variant="light" color="gray">{c.status}</Badge></Table.Td>
+                        </Table.Tr>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </Table.Tbody>
+                  </Table>
+                </Table.ScrollContainer>
               )}
-          </div>
+          </Card>
         </>
       )}
-    </>
+    </Stack>
   )
 }
