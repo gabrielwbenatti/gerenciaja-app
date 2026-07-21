@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { Alerta, PaginaTopo } from '../ui'
 
@@ -6,6 +7,7 @@ const qtd = (v) =>
   new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(v ?? 0)
 
 export default function Estoque() {
+  const navigate = useNavigate()
   const [saldos, setSaldos] = useState(null)
   const [erro, setErro] = useState(null)
 
@@ -31,6 +33,7 @@ export default function Estoque() {
                   <th style={{ textAlign: 'right' }}>Disponível</th>
                   <th style={{ textAlign: 'right' }}>Mínimo</th>
                   <th>Situação</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -39,7 +42,9 @@ export default function Estoque() {
                   const abaixoMinimo = Number(s.quantidade) < Number(s.estoqueMinimo)
                   const zerado = Number(s.quantidade) <= 0
                   return (
-                    <tr key={s.produtoId}>
+                    <tr key={s.produtoId} style={{ cursor: 'pointer' }}
+                        onClick={() => navigate(`/estoque/${s.produtoId}`)}
+                        title="Ver extrato">
                       <td>{s.sku}</td>
                       <td>{s.nome}</td>
                       <td>{s.unidade}</td>
@@ -48,6 +53,7 @@ export default function Estoque() {
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>{qtd(disponivel)}</td>
                       <td style={{ textAlign: 'right', color: 'var(--muted)' }}>{qtd(s.estoqueMinimo)}</td>
                       <td>{situacao(zerado, abaixoMinimo)}</td>
+                      <td><span className="btn-linha">Extrato →</span></td>
                     </tr>
                   )
                 })}

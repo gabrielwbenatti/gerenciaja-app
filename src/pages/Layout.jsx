@@ -21,6 +21,7 @@ export default function Layout({ empresa, aoSair }) {
           <NavLink to="/pessoas" className={link}>Pessoas</NavLink>
           <NavLink to="/produtos" className={link}>Produtos</NavLink>
           <NavLink to="/recebimento" className={link}>Entrada de mercadoria</NavLink>
+          <NavLink to="/notas" className={link}>Notas de entrada</NavLink>
           <NavLink to="/estoque" className={link}>Estoque</NavLink>
         </nav>
         <div className="empresa-box">

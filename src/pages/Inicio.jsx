@@ -1,4 +1,5 @@
 import { PaginaTopo } from '../ui'
+import { formatDocument } from '../lib/format'
 
 export default function Inicio({ empresa }) {
   const regimeLabel = {
@@ -13,7 +14,7 @@ export default function Inicio({ empresa }) {
       <div className="card">
         <h2>{empresa?.razaoSocial}</h2>
         <div className="form-grid">
-          <div><div className="rotulo" style={{ color: 'var(--muted)', fontSize: 12 }}>CNPJ</div>{empresa?.cnpj}</div>
+          <div><div className="rotulo" style={{ color: 'var(--muted)', fontSize: 12 }}>CNPJ</div>{formatDocument(empresa?.cnpj)}</div>
           <div><div className="rotulo" style={{ color: 'var(--muted)', fontSize: 12 }}>Regime</div>{regimeLabel}</div>
           <div><div className="rotulo" style={{ color: 'var(--muted)', fontSize: 12 }}>Depósito padrão</div>#{empresa?.depositoPadraoId}</div>
         </div>

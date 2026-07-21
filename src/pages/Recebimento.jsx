@@ -3,6 +3,7 @@ import { api } from '../api'
 import { getEmpresa } from '../tenant'
 import { Campo, Alerta, PaginaTopo } from '../ui'
 import Combobox from '../components/Combobox'
+import { formatDocument } from '../lib/format'
 
 const hoje = () => new Date().toISOString().slice(0, 10)
 
@@ -167,8 +168,8 @@ function FormRecebimento({ empresa, fornecedores, produtos }) {
               onChange={setFornecedorId}
               getId={(f) => f.id}
               getPrimary={(f) => f.nome}
-              getSecondary={(f) => f.documento + (f.nomeFantasia ? ' · ' + f.nomeFantasia : '')}
-              termos={(f) => [f.nome, f.nomeFantasia, f.documento].filter(Boolean).join(' ')}
+              getSecondary={(f) => formatDocument(f.documento) + (f.nomeFantasia ? ' · ' + f.nomeFantasia : '')}
+              termos={(f) => [f.nome, f.nomeFantasia, f.documento, formatDocument(f.documento)].filter(Boolean).join(' ')}
               placeholder="Buscar fornecedor…"
             />
           </Campo>

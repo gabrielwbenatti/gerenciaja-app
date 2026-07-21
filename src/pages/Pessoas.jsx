@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { Campo, Alerta, PaginaTopo } from '../ui'
+import { maskDocument, formatDocument, limparDocumento } from '../lib/format'
 
 const PAPEIS = ['CLIENTE', 'FORNECEDOR', 'TRANSPORTADORA', 'VENDEDOR']
 
@@ -55,7 +56,7 @@ export default function Pessoas() {
                   <tr key={p.id}>
                     <td>{p.nome}{p.nomeFantasia && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{p.nomeFantasia}</div>}</td>
                     <td>{p.tipo}</td>
-                    <td>{p.documento}</td>
+                    <td>{formatDocument(p.documento)}</td>
                     <td>{p.papeis.map((pp) => <span key={pp} className="tag">{pp}</span>)}</td>
                     <td>{p.email || p.telefone || '—'}</td>
                   </tr>
@@ -76,15 +77,15 @@ function FormPessoa({ aoSalvar, aoCancelar }) {
 
   const set = (campo) => (e) => setForm({ ...form, [campo]: e.target.value })
 
-  // Detecta PF/PJ pelo documento enquanto digita: 11 = CPF (PF), 14 = CNPJ (PJ).
-  // Abaixo de 11 mantem o tipo atual, para nao ficar trocando a cada tecla.
-  // O seletor manual continua funcionando e sobrepoe quando o usuario escolhe.
+  // Máscara na digitação + detecção de PF/PJ pelo tamanho: 11 = CPF (PF),
+  // 12+ = CNPJ (PJ). Abaixo de 11 mantém o tipo atual (não fica trocando a cada
+  // tecla). O seletor manual continua sobrepondo quando o usuário escolhe.
   function onDocumento(e) {
-    const valor = e.target.value
-    const qtd = valor.replace(/[^A-Za-z0-9]/g, '').length
+    const mascarado = maskDocument(e.target.value)
+    const qtd = limparDocumento(mascarado).length
     setForm((f) => ({
       ...f,
-      documento: valor,
+      documento: mascarado,
       tipo: qtd >= 12 ? 'PJ' : qtd === 11 ? 'PF' : f.tipo,
     }))
   }

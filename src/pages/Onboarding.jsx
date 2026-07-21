@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { setEmpresa } from '../tenant'
 import { Campo, Alerta } from '../ui'
+import { maskDocument } from '../lib/format'
 
 const REGIMES = [
   ['SIMPLES_NACIONAL', 'Simples Nacional'],
@@ -55,7 +56,8 @@ export default function Onboarding({ aoConcluir }) {
               <input value={form.nomeFantasia} onChange={set('nomeFantasia')} />
             </Campo>
             <Campo label="CNPJ" req ajuda="Com ou sem pontuação">
-              <input value={form.cnpj} onChange={set('cnpj')}
+              <input value={form.cnpj}
+                     onChange={(e) => setForm({ ...form, cnpj: maskDocument(e.target.value) })}
                      placeholder="12.345.678/0001-95" required />
             </Campo>
             <Campo label="Inscrição estadual">

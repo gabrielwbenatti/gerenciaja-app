@@ -8,6 +8,9 @@ import Pessoas from './pages/Pessoas'
 import Produtos from './pages/Produtos'
 import Recebimento from './pages/Recebimento'
 import Estoque from './pages/Estoque'
+import Extrato from './pages/Extrato'
+import NotasEntrada from './pages/NotasEntrada'
+import NotaEntradaDetalhe from './pages/NotaEntradaDetalhe'
 
 export default function App() {
   // Fonte de verdade da "sessao" provisoria: a empresa no localStorage.
@@ -30,7 +33,10 @@ export default function App() {
           <Route path="/pessoas" element={<Pessoas />} />
           <Route path="/produtos" element={<Produtos />} />
           <Route path="/recebimento" element={<Recebimento />} />
+          <Route path="/notas" element={<NotasEntrada />} />
+          <Route path="/notas/:id" element={<NotaEntradaDetalhe />} />
           <Route path="/estoque" element={<Estoque />} />
+          <Route path="/estoque/:produtoId" element={<Extrato />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       ) : (
