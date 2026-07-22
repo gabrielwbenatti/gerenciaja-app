@@ -20,6 +20,11 @@ const filtroBusca = ({ options, search }) => {
 }
 
 const hoje = () => new Date().toISOString().slice(0, 10)
+const somarDias = (data, dias) => {
+  const d = new Date(data + 'T00:00:00')
+  d.setDate(d.getDate() + dias)
+  return d.toISOString().slice(0, 10)
+}
 const brl = (v) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
 const num = (v) => (v === '' || v == null ? 0 : Number(v))
@@ -30,6 +35,26 @@ const itemVazio = () => ({
   valorUnitario: '', loteCodigo: '', dataValidade: '',
 })
 const dupVazia = () => ({ numero: '', vencimento: '', valor: '' })
+
+// Rascunho no navegador: um recebimento tem muito campo pra digitar de novo se
+// a aba recarregar por qualquer motivo (F5 sem querer, queda de rede, crash).
+// Guarda a chave de idempotencia junto -- se o envio anterior tiver ido pro ar
+// e so a resposta se perdeu, reenviar com a mesma chave devolve o resultado
+// original em vez de escriturar a nota duas vezes.
+const RASCUNHO_KEY = 'gerencieja.recebimento.rascunho'
+
+function carregarRascunho() {
+  try {
+    const bruto = localStorage.getItem(RASCUNHO_KEY)
+    return bruto ? JSON.parse(bruto) : null
+  } catch {
+    return null
+  }
+}
+
+function limparRascunho() {
+  localStorage.removeItem(RASCUNHO_KEY)
+}
 
 export default function Recebimento() {
   const empresa = getEmpresa()
@@ -71,20 +96,35 @@ function FormRecebimento({ empresa, fornecedores, setFornecedores, produtos, set
   const optProdutos = useMemo(
     () => produtos.map((p) => ({ value: String(p.id), label: `${p.sku} — ${p.nome}` })), [produtos])
 
-  const [fornecedorId, setFornecedorId] = useState('')
-  const [nota, setNota] = useState({
+  const [rascunho] = useState(carregarRascunho)
+
+  const [fornecedorId, setFornecedorId] = useState(rascunho?.fornecedorId ?? '')
+  const [nota, setNota] = useState(rascunho?.nota ?? {
     serie: '', numero: '', dataEmissao: hoje(), dataEntrada: hoje(),
     naturezaOperacao: 'Compra para revenda', valorFrete: '', valorDesconto: '', valorTotal: '',
   })
-  const [itens, setItens] = useState([itemVazio()])
-  const [duplicatas, setDuplicatas] = useState([dupVazia()])
+  const [itens, setItens] = useState(rascunho?.itens ?? [itemVazio()])
+  const [duplicatas, setDuplicatas] = useState(rascunho?.duplicatas ?? [dupVazia()])
+  const [qtdParcelas, setQtdParcelas] = useState(rascunho?.qtdParcelas ?? 1)
+  const [primeiroVencimento, setPrimeiroVencimento] = useState(rascunho?.primeiroVencimento ?? hoje())
+  const [intervaloDias, setIntervaloDias] = useState(rascunho?.intervaloDias ?? 30)
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState(null)
-  const [chaveIdem] = useState(() => 'web-' + crypto.randomUUID())
+  const [chaveIdem] = useState(() => rascunho?.chaveIdem ?? 'web-' + crypto.randomUUID())
+
+  // Salva a cada mudanca -- e' so digitacao de formulario, custo desprezivel.
+  useEffect(() => {
+    localStorage.setItem(RASCUNHO_KEY, JSON.stringify({
+      fornecedorId, nota, itens, duplicatas, qtdParcelas, primeiroVencimento, intervaloDias, chaveIdem,
+    }))
+  }, [fornecedorId, nota, itens, duplicatas, qtdParcelas, primeiroVencimento, intervaloDias, chaveIdem])
 
   const setN = (campo) => (valor) => setNota((n) => ({ ...n, [campo]: valor }))
   function setItem(i, campo, valor) {
     setItens((arr) => arr.map((it, idx) => (idx === i ? { ...it, [campo]: valor } : it)))
+  }
+  function setDuplicata(i, campo, valor) {
+    setDuplicatas((arr) => arr.map((d, idx) => (idx === i ? { ...d, [campo]: valor } : d)))
   }
   function produtoCriado(i, produto) {
     setProdutos((lista) => [...lista, produto])
@@ -93,6 +133,23 @@ function FormRecebimento({ empresa, fornecedores, setFornecedores, produtos, set
   function fornecedorCriado(pessoa) {
     setFornecedores((lista) => [...lista, pessoa])
     setFornecedorId(String(pessoa.id))
+  }
+  function gerarParcelas() {
+    const qtd = Math.max(1, Math.trunc(num(qtdParcelas)))
+    const total = num(nota.valorTotal)
+    if (!nota.numero.trim())
+      return notifications.show({ color: 'red', message: 'Informe o número da nota antes de gerar as parcelas.' })
+    if (total <= 0)
+      return notifications.show({ color: 'red', message: 'Informe o total da nota antes de gerar as parcelas.' })
+
+    // resto da divisao vai pra ultima parcela, pra soma bater exatamente com o total
+    const valorBase = Math.floor((total / qtd) * 100) / 100
+    const novas = Array.from({ length: qtd }, (_, i) => ({
+      numero: `${nota.numero}-${i + 1}/${qtd}`,
+      vencimento: somarDias(primeiroVencimento, intervaloDias * i),
+      valor: i === qtd - 1 ? arred2(total - valorBase * (qtd - 1)) : valorBase,
+    }))
+    setDuplicatas(novas)
   }
   const totalItem = (it) => arred2(num(it.quantidadeDeclarada) * num(it.valorUnitario))
 
@@ -142,6 +199,7 @@ function FormRecebimento({ empresa, fornecedores, setFornecedores, produtos, set
     try {
       const r = await api.post('/recebimentos', comando)
       setResultado(r)
+      limparRascunho()
       notifications.show({ color: 'green', message: 'Entrada registrada.' })
     } catch (err) {
       notifications.show({ color: 'red', title: 'Erro ao registrar', message: err.message })
@@ -275,16 +333,25 @@ function FormRecebimento({ empresa, fornecedores, setFornecedores, produtos, set
         </Group>
 
         <Divider my="lg" label="Duplicatas (parcelas a pagar)" labelPosition="left" />
+        <Group align="flex-end" gap="xs" mb="sm">
+          <NumberInput label="Qtd. parcelas" min={1} decimalScale={0} w={110}
+                       value={qtdParcelas} onChange={setQtdParcelas} />
+          <TextInput label="1º vencimento" type="date" w={150} value={primeiroVencimento}
+                     onChange={(e) => setPrimeiroVencimento(e.currentTarget.value)} />
+          <NumberInput label="Intervalo (dias)" min={0} decimalScale={0} w={130}
+                       value={intervaloDias} onChange={setIntervaloDias} />
+          <Button variant="light" onClick={gerarParcelas}>Gerar parcelas</Button>
+        </Group>
         <Stack gap="xs">
           {duplicatas.map((d, i) => (
             <Group key={i} align="flex-end" wrap="nowrap">
               <Group grow align="flex-end" style={{ flex: 1 }}>
                 <TextInput label="Número" value={d.numero}
-                           onChange={(e) => setDuplicatas((a) => a.map((x, idx) => idx === i ? { ...x, numero: e.currentTarget.value } : x))} />
+                           onChange={(e) => setDuplicata(i, 'numero', e.currentTarget.value)} />
                 <TextInput label="Vencimento" type="date" value={d.vencimento}
-                           onChange={(e) => setDuplicatas((a) => a.map((x, idx) => idx === i ? { ...x, vencimento: e.currentTarget.value } : x))} />
+                           onChange={(e) => setDuplicata(i, 'vencimento', e.currentTarget.value)} />
                 <NumberInput label="Valor" min={0} decimalScale={2} prefix="R$ " value={d.valor}
-                             onChange={(v) => setDuplicatas((a) => a.map((x, idx) => idx === i ? { ...x, valor: v } : x))} />
+                             onChange={(v) => setDuplicata(i, 'valor', v)} />
               </Group>
               <ActionIcon variant="subtle" color="red" mb={4} disabled={duplicatas.length === 1}
                           onClick={() => setDuplicatas((a) => a.filter((_, idx) => idx !== i))}>✕</ActionIcon>

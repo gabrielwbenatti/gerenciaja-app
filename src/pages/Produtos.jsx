@@ -7,6 +7,7 @@ import { notifications } from '@mantine/notifications'
 import { api } from '../api'
 import { PageHeader } from '../components/PageHeader'
 import { ModalNovoProduto } from '../components/ModalNovoProduto'
+import { ModalEditarProduto } from '../components/ModalEditarProduto'
 import { normalizeBusca } from '../lib/format'
 
 const brl = (v) =>
@@ -17,6 +18,8 @@ export default function Produtos() {
   const [erro, setErro] = useState(null)
   const [filtro, setFiltro] = useState('')
   const [aberto, { open, close }] = useDisclosure(false)
+  const [produtoEditando, setProdutoEditando] = useState(null)
+  const [editando, { open: abrirEdicao, close: fecharEdicao }] = useDisclosure(false)
 
   const listaFiltrada = useMemo(() => {
     if (!lista) return null
@@ -44,6 +47,11 @@ export default function Produtos() {
     } catch (err) {
       notifications.show({ color: 'red', message: err.message })
     }
+  }
+
+  function editar(p) {
+    setProdutoEditando(p)
+    abrirEdicao()
   }
 
   return (
@@ -80,7 +88,7 @@ export default function Produtos() {
                   <Table.Th>SKU</Table.Th><Table.Th>Nome</Table.Th><Table.Th>Un.</Table.Th>
                   <Table.Th ta="right">Preço venda</Table.Th>
                   <Table.Th ta="right">Custo médio</Table.Th>
-                  <Table.Th>Lote</Table.Th><Table.Th>Situação</Table.Th><Table.Th />
+                  <Table.Th>Lote</Table.Th><Table.Th>Situação</Table.Th><Table.Th /><Table.Th />
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -100,6 +108,11 @@ export default function Produtos() {
                       </Badge>
                     </Table.Td>
                     <Table.Td>
+                      <Button variant="subtle" size="compact-sm" onClick={() => editar(p)}>
+                        Editar
+                      </Button>
+                    </Table.Td>
+                    <Table.Td>
                       <Button variant="subtle" size="compact-sm" onClick={() => alternarSituacao(p)}>
                         {p.ativo ? 'Inativar' : 'Reativar'}
                       </Button>
@@ -113,6 +126,8 @@ export default function Produtos() {
       </Card>
 
       <ModalNovoProduto opened={aberto} onClose={close} onCriado={carregar} />
+      <ModalEditarProduto produto={produtoEditando} opened={editando}
+                          onClose={fecharEdicao} onSalvo={carregar} />
     </Stack>
   )
 }

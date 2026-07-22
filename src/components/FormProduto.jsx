@@ -3,8 +3,7 @@ import { TextInput, NumberInput, Select, Switch, Group, Stack, Button } from '@m
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
 import { api } from '../api'
-
-const UNIDADES = ['UN', 'KG', 'G', 'CX', 'L', 'ML', 'M', 'M2', 'M3', 'PC']
+import { UNIDADES } from '../lib/catalogo'
 
 /**
  * Formulario de cadastro de produto. Compartilhado entre a tela de Produtos
