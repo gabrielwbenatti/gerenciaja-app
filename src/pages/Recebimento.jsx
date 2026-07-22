@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Card, Select, TextInput, NumberInput, Button, ActionIcon, Grid, Group, Stack,
+  Card, TextInput, NumberInput, Button, ActionIcon, Grid, Group, Stack,
   Text, Title, Badge, Divider, Loader, Center, Alert,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { api } from '../api'
 import { getEmpresa } from '../tenant'
 import { PageHeader } from '../components/PageHeader'
+import { ModalNovoProduto } from '../components/ModalNovoProduto'
+import { ModalNovaPessoa } from '../components/ModalNovaPessoa'
+import { SelectComCadastro } from '../components/SelectComCadastro'
 import { formatDocument, normalizeBusca } from '../lib/format'
 
 // Filtro que ignora formatação: "60575" acha "60.575...". Vale para nome e doc.
@@ -53,12 +56,13 @@ export default function Recebimento() {
       {produtos.length === 0 && (
         <Alert color="yellow">Cadastre ao menos um produto antes de dar entrada.</Alert>
       )}
-      <FormRecebimento empresa={empresa} fornecedores={fornecedores} produtos={produtos} />
+      <FormRecebimento empresa={empresa} fornecedores={fornecedores} setFornecedores={setFornecedores}
+                       produtos={produtos} setProdutos={setProdutos} />
     </Stack>
   )
 }
 
-function FormRecebimento({ empresa, fornecedores, produtos }) {
+function FormRecebimento({ empresa, fornecedores, setFornecedores, produtos, setProdutos }) {
   const produtoPorId = useMemo(
     () => Object.fromEntries(produtos.map((p) => [String(p.id), p])), [produtos])
   const optFornecedores = useMemo(
@@ -81,6 +85,14 @@ function FormRecebimento({ empresa, fornecedores, produtos }) {
   const setN = (campo) => (valor) => setNota((n) => ({ ...n, [campo]: valor }))
   function setItem(i, campo, valor) {
     setItens((arr) => arr.map((it, idx) => (idx === i ? { ...it, [campo]: valor } : it)))
+  }
+  function produtoCriado(i, produto) {
+    setProdutos((lista) => [...lista, produto])
+    setItem(i, 'produtoId', String(produto.id))
+  }
+  function fornecedorCriado(pessoa) {
+    setFornecedores((lista) => [...lista, pessoa])
+    setFornecedorId(String(pessoa.id))
   }
   const totalItem = (it) => arred2(num(it.quantidadeDeclarada) * num(it.valorUnitario))
 
@@ -163,9 +175,11 @@ function FormRecebimento({ empresa, fornecedores, produtos }) {
       <Card withBorder padding="lg">
         <Title order={4} mb="md">Nota fiscal</Title>
         <Stack>
-          <Select label="Fornecedor" withAsterisk searchable data={optFornecedores}
+          <SelectComCadastro label="Fornecedor" withAsterisk searchable data={optFornecedores}
                   value={fornecedorId} onChange={setFornecedorId} filter={filtroBusca}
-                  placeholder="Buscar por nome ou CNPJ…" nothingFoundMessage="Nada encontrado" />
+                  placeholder="Buscar por nome ou CNPJ…" nothingFoundMessage="Nada encontrado"
+                  modal={ModalNovaPessoa} onCriado={fornecedorCriado}
+                  modalProps={{ papeisIniciais: ['FORNECEDOR'], title: 'Novo fornecedor' }} />
           <Group grow>
             <TextInput label="Série" withAsterisk value={nota.serie}
                        onChange={(e) => setN('serie')(e.currentTarget.value)} />
@@ -194,10 +208,11 @@ function FormRecebimento({ empresa, fornecedores, produtos }) {
               <Card key={i} withBorder padding="sm" bg="var(--mantine-color-gray-0)">
                 <Grid align="flex-end" gutter="xs">
                   <Grid.Col span={{ base: 12, md: controla ? 4 : 5 }}>
-                    <Select label="Produto" searchable data={optProdutos} filter={filtroBusca}
+                    <SelectComCadastro label="Produto" searchable data={optProdutos} filter={filtroBusca}
                             value={it.produtoId || null}
                             onChange={(v) => setItem(i, 'produtoId', v || '')}
-                            placeholder="Buscar produto…" nothingFoundMessage="Nada encontrado" />
+                            placeholder="Buscar produto…" nothingFoundMessage="Nada encontrado"
+                            modal={ModalNovoProduto} onCriado={(produto) => produtoCriado(i, produto)} />
                   </Grid.Col>
                   <Grid.Col span={{ base: 4, md: 2 }}>
                     <NumberInput label="Qtd. nota" min={0} decimalScale={3} value={it.quantidadeDeclarada}
