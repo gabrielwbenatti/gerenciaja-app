@@ -7,6 +7,8 @@ import Inicio from './pages/Inicio'
 import Pessoas from './pages/Pessoas'
 import Produtos from './pages/Produtos'
 import Recebimento from './pages/Recebimento'
+import Vendas from './pages/Vendas'
+import VendaEditar from './pages/VendaEditar'
 import Estoque from './pages/Estoque'
 import Extrato from './pages/Extrato'
 import NotasEntrada from './pages/NotasEntrada'
@@ -36,6 +38,11 @@ export default function App() {
           <Route path="/recebimento" element={<Recebimento />} />
           <Route path="/notas" element={<NotasEntrada />} />
           <Route path="/notas/:id" element={<NotaEntradaDetalhe />} />
+          <Route path="/vendas" element={<Vendas />} />
+          {/* "novo" antes de ":id": o react-router prefere o segmento estático,
+              mas deixar explícito evita que /vendas/novo caia no detalhe. */}
+          <Route path="/vendas/novo" element={<VendaEditar />} />
+          <Route path="/vendas/:id" element={<VendaEditar />} />
           <Route path="/estoque" element={<Estoque />} />
           <Route path="/estoque/:produtoId" element={<Extrato />} />
           <Route path="/configuracoes" element={<Configuracoes />} />

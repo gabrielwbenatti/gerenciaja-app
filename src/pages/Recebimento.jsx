@@ -75,12 +75,6 @@ export default function Recebimento() {
     <Stack>
       <PageHeader title="Entrada de mercadoria"
         subtitle="Escrituração de NF-e: estoque, custo e contas a pagar em uma operação" />
-      {fornecedores.length === 0 && (
-        <Alert color="yellow">Cadastre ao menos um fornecedor em “Pessoas” antes de dar entrada.</Alert>
-      )}
-      {produtos.length === 0 && (
-        <Alert color="yellow">Cadastre ao menos um produto antes de dar entrada.</Alert>
-      )}
       <FormRecebimento empresa={empresa} fornecedores={fornecedores} setFornecedores={setFornecedores}
                        produtos={produtos} setProdutos={setProdutos} />
     </Stack>

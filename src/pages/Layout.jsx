@@ -8,6 +8,7 @@ const LINKS = [
   { to: '/produtos', label: 'Produtos' },
   { to: '/recebimento', label: 'Entrada de mercadoria' },
   { to: '/notas', label: 'Notas de entrada' },
+  { to: '/vendas', label: 'Pedidos de venda' },
   { to: '/estoque', label: 'Estoque' },
   { to: '/configuracoes', label: 'Configurações' },
 ]
