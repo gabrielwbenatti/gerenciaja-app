@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Card, TextInput, NumberInput, Textarea, Button, ActionIcon, Grid, Group,
-  Stack, Text, Title, Divider, Loader, Center, Alert, Tooltip,
+  Stack, Text, Title, Divider, Loader, Center, Alert, Tooltip, Badge,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { api } from '../api'
@@ -22,12 +22,15 @@ const filtroBusca = ({ options, search }) => {
 }
 
 const hoje = () => new Date().toISOString().slice(0, 10)
+const data = (iso) => (iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : null)
 const brl = (v) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
 const num = (v) => (v === '' || v == null ? 0 : Number(v))
 const arred2 = (v) => Math.round(v * 100) / 100
 
-const itemVazio = () => ({ produtoId: '', quantidade: '', precoUnitario: '', desconto: '' })
+const itemVazio = () => ({
+  produtoId: '', quantidade: '', precoUnitario: '', desconto: '', alocacoes: [],
+})
 
 export default function VendaEditar() {
   const { id } = useParams()
@@ -37,6 +40,7 @@ export default function VendaEditar() {
   const [produtos, setProdutos] = useState(null)
   const [venda, setVenda] = useState(null)
   const [erroCarga, setErroCarga] = useState(null)
+  const [acao, setAcao] = useState(false)
 
   useEffect(() => {
     const chamadas = [api.get('/pessoas?papel=CLIENTE'), api.get('/produtos')]
@@ -46,6 +50,18 @@ export default function VendaEditar() {
       .then(([c, p, v]) => { setClientes(c); setProdutos(p); setVenda(v ?? null) })
       .catch((e) => setErroCarga(e.message))
   }, [id, novo])
+
+  async function executar(rota, mensagem) {
+    setAcao(true)
+    try {
+      setVenda(await api.post(`/vendas/${id}/${rota}`))
+      notifications.show({ color: 'green', message: mensagem })
+    } catch (err) {
+      notifications.show({ color: 'red', title: 'Não foi possível', message: err.message })
+    } finally {
+      setAcao(false)
+    }
+  }
 
   if (erroCarga) return <Alert color="red">{erroCarga}</Alert>
   if (!clientes || !produtos || (!novo && !venda)) return <Center p="xl"><Loader /></Center>
@@ -57,9 +73,27 @@ export default function VendaEditar() {
         subtitle={novo
           ? 'A emissão pode ser retroativa e o mesmo produto pode entrar em mais de uma linha'
           : null}
-        action={!novo ? statusVenda(venda.status) : null}
+        action={!novo && (
+          <Group gap="sm">
+            {statusVenda(venda.status)}
+            {venda.status === 'ORCAMENTO' && (
+              <Button loading={acao}
+                      onClick={() => executar('confirmacao', 'Pedido confirmado — estoque reservado.')}>
+                Confirmar
+              </Button>
+            )}
+            {venda.status === 'CONFIRMADA' && (
+              <Button color="green" loading={acao}
+                      onClick={() => executar('faturamento', 'Pedido faturado — estoque baixado.')}>
+                Faturar
+              </Button>
+            )}
+          </Group>
+        )}
       />
-      <FormVenda key={venda?.id ?? 'novo'} venda={venda}
+      {/* O status entra na key de propósito: o FormVenda calcula "editável" na
+          montagem, então confirmar precisa remontá-lo para travar os campos. */}
+      <FormVenda key={`${venda?.id ?? 'novo'}-${venda?.status ?? ''}`} venda={venda}
                  clientes={clientes} setClientes={setClientes}
                  produtos={produtos} setProdutos={setProdutos} />
     </Stack>
@@ -97,6 +131,10 @@ function FormVenda({ venda, clientes, setClientes, produtos, setProdutos }) {
         quantidade: i.quantidade,
         precoUnitario: i.precoUnitario,
         desconto: i.desconto || '',
+        // Só para exibição: de quais lotes a linha saiu e a que custo. Não
+        // volta no PUT — quem aloca é o backend, na confirmação.
+        alocacoes: i.alocacoes ?? [],
+        custoUnitarioBaixa: i.custoUnitarioBaixa,
       })))
   const [enviando, setEnviando] = useState(false)
 
@@ -272,6 +310,24 @@ function FormVenda({ venda, clientes, setClientes, produtos, setProdutos }) {
                   </Group>
                 </Grid.Col>
               </Grid>
+
+              {/* Rastreabilidade: de qual lote a linha saiu. Aparece a partir
+                  da confirmação — é o que responde "esse cliente levou qual
+                  lote" num recall. */}
+              {it.alocacoes?.length > 0 && (
+                <Group gap="xs" mt="xs" align="center">
+                  <Text size="xs" c="dimmed" fw={600} tt="uppercase">Sai de</Text>
+                  {it.alocacoes.map((a, k) => (
+                    <Badge key={k} variant="light" size="sm">
+                      {a.lote} · {Number(a.quantidade)}
+                      {a.dataValidade ? ` · val ${data(a.dataValidade)}` : ''}
+                    </Badge>
+                  ))}
+                  {it.custoUnitarioBaixa != null && (
+                    <Text size="xs" c="dimmed">custo {brl(it.custoUnitarioBaixa)}/un</Text>
+                  )}
+                </Group>
+              )}
             </Card>
           ))}
         </Stack>

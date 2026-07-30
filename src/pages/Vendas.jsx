@@ -128,7 +128,8 @@ export default function Vendas() {
                     <Table.Td ta="right" fw={600}>{brl(v.valorLiquido)}</Table.Td>
                     <Table.Td>{statusVenda(v.status)}</Table.Td>
                     <Table.Td>
-                      {v.status === 'ORCAMENTO' && (
+                      {/* Faturado não cancela: o caminho é devolução. */}
+                      {['ORCAMENTO', 'CONFIRMADA'].includes(v.status) && (
                         <Button variant="subtle" color="red" size="compact-sm"
                                 onClick={(e) => { e.stopPropagation(); setCancelando(v) }}>
                           Cancelar
@@ -149,6 +150,11 @@ export default function Vendas() {
             O pedido {cancelando?.numero} de {cancelando?.cliente} será marcado como cancelado.
             Ele continua no histórico, mas não poderá mais ser editado.
           </Text>
+          {cancelando?.status === 'CONFIRMADA' && (
+            <Text size="sm" c="dimmed">
+              O estoque reservado para ele volta a ficar disponível.
+            </Text>
+          )}
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setCancelando(null)}>Voltar</Button>
             <Button color="red" onClick={confirmarCancelamento}>Cancelar pedido</Button>
