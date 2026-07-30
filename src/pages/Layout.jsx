@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AppShell, NavLink, Text, Button, Stack, Box } from '@mantine/core'
-import { limparEmpresa } from '../tenant'
+import { limparSessao } from '../sessao'
 
 const LINKS = [
   { to: '/', label: 'Início', exact: true },
@@ -13,14 +13,15 @@ const LINKS = [
   { to: '/configuracoes', label: 'Configurações' },
 ]
 
-export default function Layout({ empresa, aoSair }) {
+export default function Layout({ sessao, aoSair }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const { empresa, usuario } = sessao
 
   function sair() {
-    limparEmpresa()
+    limparSessao()
     aoSair?.()
-    navigate('/onboarding')
+    navigate('/login')
   }
 
   const ativo = (l) => (l.exact ? pathname === l.to : pathname.startsWith(l.to))
@@ -48,11 +49,12 @@ export default function Layout({ empresa, aoSair }) {
 
           <Box>
             <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Empresa</Text>
-            <Text fw={600} size="sm" mb="xs">
+            <Text fw={600} size="sm">
               {empresa?.nomeFantasia || empresa?.razaoSocial}
             </Text>
+            <Text size="xs" c="dimmed" mb="xs">{usuario?.nome}</Text>
             <Button variant="default" size="xs" fullWidth onClick={sair}>
-              Trocar empresa
+              Sair
             </Button>
           </Box>
         </Stack>

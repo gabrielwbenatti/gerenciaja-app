@@ -1,7 +1,12 @@
-// Cliente HTTP unico. Injeta o X-Tenant-Id (provisorio -- ver TenantFilter no
-// backend) em toda chamada, exceto no cadastro de empresa, que roda sem tenant.
+// Cliente HTTP unico. Manda o token da sessao em toda chamada, exceto nas duas
+// publicas (login e cadastro de empresa), que sao justamente as que criam a
+// sessao.
+//
+// O X-Tenant-Id sumiu: o tenant agora e uma claim assinada dentro do token, e
+// nao mais um header que o front escolhe -- que era o buraco que deixava
+// qualquer cliente ler dados de outra empresa.
 
-import { getTenantId } from './tenant'
+import { getToken, limparSessao } from './sessao'
 
 const BASE = '/api'
 
@@ -13,12 +18,12 @@ class ApiError extends Error {
   }
 }
 
-async function request(method, path, { body, semTenant = false } = {}) {
+async function request(method, path, { body, publico = false } = {}) {
   const headers = { 'Content-Type': 'application/json' }
 
-  if (!semTenant) {
-    const tenant = getTenantId()
-    if (tenant) headers['X-Tenant-Id'] = tenant
+  if (!publico) {
+    const token = getToken()
+    if (token) headers.Authorization = `Bearer ${token}`
   }
 
   const resp = await fetch(BASE + path, {
@@ -26,6 +31,20 @@ async function request(method, path, { body, semTenant = false } = {}) {
     headers,
     body: body != null ? JSON.stringify(body) : undefined,
   })
+
+  // 401 numa rota protegida = token expirado, adulterado ou ausente. Limpa e
+  // manda para o login.
+  //
+  // A rota publica fica de fora porque o 401 dela e outra coisa: e "senha
+  // errada", e precisa chegar na tela como mensagem em vez de virar um
+  // redirecionamento que engole o erro.
+  if (resp.status === 401 && !publico) {
+    limparSessao()
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
+    throw new ApiError(401, { mensagem: 'Sessão expirada. Entre novamente.' })
+  }
 
   if (resp.status === 204) return null
 
@@ -43,8 +62,12 @@ export const api = {
   patch: (path, body) => request('PATCH', path, { body }),
   del: (path) => request('DELETE', path),
 
-  // Cadastro de empresa: unico fluxo sem tenant (e ele que cria o tenant).
-  cadastrarEmpresa: (body) => request('POST', '/empresas', { body, semTenant: true }),
+  // -- publicas: sem token, sao elas que devolvem um --
+  login: (body) => request('POST', '/auth/login', { body, publico: true }),
+  cadastrarEmpresa: (body) => request('POST', '/empresas', { body, publico: true }),
+
+  /** Revalida o token guardado e devolve a sessao atualizada. */
+  sessao: () => request('GET', '/auth/sessao'),
 }
 
 export { ApiError }

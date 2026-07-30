@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Card, Switch, Stack, Text, Loader, Center, Alert } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { api } from '../api'
-import { getEmpresa, setEmpresa } from '../tenant'
+import { getEmpresa, atualizarEmpresa } from '../sessao'
 import { PageHeader } from '../components/PageHeader'
 
 export default function Configuracoes() {
@@ -24,8 +24,8 @@ export default function Configuracoes() {
     setConfig({ ...config, [campo]: valor })
     try {
       const atualizada = await api.patch(`/empresas/${empresaLocal.id}/config`, { [campo]: valor })
-      // Atualiza só o campo no localStorage, preservando depositoPadraoId e afins.
-      setEmpresa({ ...empresaLocal, [campo]: atualizada[campo] })
+      // Atualiza só o campo na sessão, preservando depositoPadraoId e afins.
+      atualizarEmpresa({ ...empresaLocal, [campo]: atualizada[campo] })
       notifications.show({ color: 'green', message: 'Configuração salva.' })
     } catch (err) {
       setConfig(anterior) // desfaz o otimismo em caso de erro

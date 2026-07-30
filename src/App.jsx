@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { getEmpresa } from './tenant'
+import { getSessao } from './sessao'
+import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
 import Layout from './pages/Layout'
 import Inicio from './pages/Inicio'
@@ -16,23 +17,25 @@ import NotaEntradaDetalhe from './pages/NotaEntradaDetalhe'
 import Configuracoes from './pages/Configuracoes'
 
 export default function App() {
-  // Fonte de verdade da "sessao" provisoria: a empresa no localStorage.
-  const [empresa, setEmpresa] = useState(getEmpresa())
+  // Fonte de verdade da sessao: o token guardado no localStorage. Sem ele, tudo
+  // cai no login -- e o servidor recusa de qualquer forma, entao esta checagem e
+  // so para nao mostrar tela quebrada.
+  const [sessao, setSessao] = useState(getSessao())
 
   return (
     <Routes>
       <Route
+        path="/login"
+        element={sessao ? <Navigate to="/" replace /> : <Login aoEntrar={setSessao} />}
+      />
+      <Route
         path="/onboarding"
-        element={
-          empresa
-            ? <Navigate to="/" replace />
-            : <Onboarding aoConcluir={setEmpresa} />
-        }
+        element={sessao ? <Navigate to="/" replace /> : <Onboarding aoConcluir={setSessao} />}
       />
 
-      {empresa ? (
-        <Route element={<Layout empresa={empresa} aoSair={() => setEmpresa(null)} />}>
-          <Route path="/" element={<Inicio empresa={empresa} />} />
+      {sessao ? (
+        <Route element={<Layout sessao={sessao} aoSair={() => setSessao(null)} />}>
+          <Route path="/" element={<Inicio empresa={sessao.empresa} />} />
           <Route path="/pessoas" element={<Pessoas />} />
           <Route path="/produtos" element={<Produtos />} />
           <Route path="/recebimento" element={<Recebimento />} />
@@ -49,7 +52,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       ) : (
-        <Route path="*" element={<Navigate to="/onboarding" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       )}
     </Routes>
   )

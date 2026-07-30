@@ -3,7 +3,7 @@ import { TextInput, Select, Chip, Group, Stack, Text, Button } from '@mantine/co
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
 import { api } from '../api'
-import { getEmpresa } from '../tenant'
+import { getEmpresa } from '../sessao'
 import { maskDocument, limparDocumento } from '../lib/format'
 
 const PAPEIS = ['CLIENTE', 'FORNECEDOR', 'TRANSPORTADORA', 'VENDEDOR']
@@ -49,6 +49,26 @@ export function FormPessoa({ aoSalvar, nomeInicial = '', papeisIniciais = ['CLIE
     else if (qtd === 11) form.setFieldValue('tipo', 'PF')
   }
 
+  /**
+   * Sem documento => pessoa física.
+   *
+   * Quem não informa CPF/CNPJ é, quase sempre, consumidor final — e o tipo
+   * inicial do formulário é PJ, que sobraria errado no cadastro. Só no blur, e
+   * não a cada tecla, senão o tipo pularia para PF no meio da digitação de um
+   * CNPJ (que passa por "vazio" no primeiro caractere apagado).
+   */
+  function onDocumentoBlur() {
+    const limpo = limparDocumento(form.values.documento)
+    if (limpo !== '' && !/^0+$/.test(limpo)) return
+
+    // Só zeros é ausência de documento, não documento. Mantê-lo seria pior do
+    // que apagá-lo: "000.000.000-00" tem 11 dígitos, passa na validação de
+    // tamanho como CPF e vira documento de verdade no banco — e o segundo
+    // cliente cadastrado assim esbarraria na unique (tenant_id, documento).
+    if (limpo !== '') form.setFieldValue('documento', '')
+    form.setFieldValue('tipo', 'PF')
+  }
+
   async function enviar(values) {
     setEnviando(true)
     try {
@@ -71,6 +91,7 @@ export function FormPessoa({ aoSalvar, nomeInicial = '', papeisIniciais = ['CLIE
           <TextInput label="CPF / CNPJ" withAsterisk={documentoObrigatorio} data-autofocus
                      placeholder="CPF (11 dígitos) ou CNPJ (14)"
                      value={form.values.documento} onChange={onDocumento}
+                     onBlur={onDocumentoBlur}
                      error={form.errors.documento} />
           <Select label="Tipo" data={[
                     { value: 'PJ', label: 'Pessoa Jurídica' },

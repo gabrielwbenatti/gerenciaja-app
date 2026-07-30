@@ -18,7 +18,7 @@ export function FormProduto({ aoSalvar, skuInicial = '', nomeInicial = '' }) {
   const form = useForm({
     initialValues: {
       sku: skuInicial, nome: nomeInicial, codigoBarras: '', unidadeMedida: 'UN',
-      precoVenda: '', estoqueMinimo: '', controlaLote: false, ncm: '',
+      precoVenda: '', estoqueMinimo: '', controlaEstoque: true, controlaLote: false, ncm: '',
     },
     validate: {
       sku: (v) => (v.trim() ? null : 'Informe o SKU'),
@@ -36,7 +36,10 @@ export function FormProduto({ aoSalvar, skuInicial = '', nomeInicial = '' }) {
         unidadeMedida: values.unidadeMedida,
         precoVenda: values.precoVenda === '' ? 0 : Number(values.precoVenda),
         estoqueMinimo: values.estoqueMinimo === '' ? 0 : Number(values.estoqueMinimo),
-        controlaLote: values.controlaLote,
+        controlaEstoque: values.controlaEstoque,
+        // Sem estoque não há lote — nem o sintético. Manda false para o backend
+        // não receber uma combinação que ele teria de recusar.
+        controlaLote: values.controlaEstoque && values.controlaLote,
         dadosFiscais: values.ncm ? { ncm: values.ncm } : null,
       })
       notifications.show({ color: 'green', message: `${values.nome} cadastrado.` })
@@ -68,11 +71,18 @@ export function FormProduto({ aoSalvar, skuInicial = '', nomeInicial = '' }) {
                        thousandSeparator="." decimalSeparator=","
                        {...form.getInputProps('precoVenda')} />
           <NumberInput label="Estoque mínimo" min={0} decimalScale={3}
+                       disabled={!form.values.controlaEstoque}
                        {...form.getInputProps('estoqueMinimo')} />
         </Group>
-        <Switch label="Este produto controla lote e validade"
-                description="Para alimentos, cosméticos, medicamentos"
-                {...form.getInputProps('controlaLote', { type: 'checkbox' })} />
+        <Switch label="Este produto controla estoque"
+                description="Desligue para serviço, frete ou taxa — não gera saldo nem aparece em Estoque"
+                {...form.getInputProps('controlaEstoque', { type: 'checkbox' })} />
+        {/* Lote só existe dentro de estoque: sem saldo não há o que rastrear. */}
+        {form.values.controlaEstoque && (
+          <Switch label="Este produto controla lote e validade"
+                  description="Para alimentos, cosméticos, medicamentos"
+                  {...form.getInputProps('controlaLote', { type: 'checkbox' })} />
+        )}
         <Group justify="flex-end" mt="sm">
           <Button type="submit" loading={enviando}>Salvar</Button>
         </Group>

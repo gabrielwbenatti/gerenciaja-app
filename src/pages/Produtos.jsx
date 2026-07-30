@@ -88,7 +88,8 @@ export default function Produtos() {
                   <Table.Th>SKU</Table.Th><Table.Th>Nome</Table.Th><Table.Th>Un.</Table.Th>
                   <Table.Th ta="right">Preço venda</Table.Th>
                   <Table.Th ta="right">Custo médio</Table.Th>
-                  <Table.Th>Lote</Table.Th><Table.Th>Situação</Table.Th><Table.Th /><Table.Th />
+                  <Table.Th>Estoque</Table.Th><Table.Th>Lote</Table.Th>
+                  <Table.Th>Situação</Table.Th><Table.Th /><Table.Th />
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -99,6 +100,11 @@ export default function Produtos() {
                     <Table.Td>{p.unidadeMedida}</Table.Td>
                     <Table.Td ta="right">{brl(p.precoVenda)}</Table.Td>
                     <Table.Td ta="right">{brl(p.custoMedio)}</Table.Td>
+                    <Table.Td>
+                      {p.controlaEstoque === false
+                        ? <Badge variant="light" color="gray">Serviço</Badge>
+                        : <Badge variant="light" color="teal">Controla</Badge>}
+                    </Table.Td>
                     <Table.Td>
                       {p.controlaLote ? <Badge variant="light">Controla</Badge> : <Text c="dimmed">—</Text>}
                     </Table.Td>

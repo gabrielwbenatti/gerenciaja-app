@@ -5,7 +5,7 @@ import {
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { api } from '../api'
-import { getEmpresa } from '../tenant'
+import { getEmpresa } from '../sessao'
 import { PageHeader } from '../components/PageHeader'
 import { ModalNovoProduto } from '../components/ModalNovoProduto'
 import { ModalNovaPessoa } from '../components/ModalNovaPessoa'
@@ -100,7 +100,9 @@ function FormRecebimento({ empresa, fornecedores, setFornecedores, produtos, set
   const [itens, setItens] = useState(rascunho?.itens ?? [itemVazio()])
   const [duplicatas, setDuplicatas] = useState(rascunho?.duplicatas ?? [dupVazia()])
   const [qtdParcelas, setQtdParcelas] = useState(rascunho?.qtdParcelas ?? 1)
-  const [primeiroVencimento, setPrimeiroVencimento] = useState(rascunho?.primeiroVencimento ?? hoje())
+  const [primeiroVencimento, setPrimeiroVencimento] =
+    useState(rascunho?.primeiroVencimento ?? rascunho?.nota?.dataEmissao ?? hoje())
+  const [vencimentoEditado, setVencimentoEditado] = useState(rascunho?.vencimentoEditado ?? false)
   const [intervaloDias, setIntervaloDias] = useState(rascunho?.intervaloDias ?? 30)
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState(null)
@@ -109,9 +111,26 @@ function FormRecebimento({ empresa, fornecedores, setFornecedores, produtos, set
   // Salva a cada mudanca -- e' so digitacao de formulario, custo desprezivel.
   useEffect(() => {
     localStorage.setItem(RASCUNHO_KEY, JSON.stringify({
-      fornecedorId, nota, itens, duplicatas, qtdParcelas, primeiroVencimento, intervaloDias, chaveIdem,
+      fornecedorId, nota, itens, duplicatas, qtdParcelas, primeiroVencimento,
+      vencimentoEditado, intervaloDias, chaveIdem,
     }))
-  }, [fornecedorId, nota, itens, duplicatas, qtdParcelas, primeiroVencimento, intervaloDias, chaveIdem])
+  }, [fornecedorId, nota, itens, duplicatas, qtdParcelas, primeiroVencimento,
+      vencimentoEditado, intervaloDias, chaveIdem])
+
+  // O parcelamento conta a partir da EMISSAO da nota, nao do dia em que se
+  // digita: nota emitida ha 15 dias ja chega com a primeira parcela vencendo
+  // dali, e nao daqui a 30 dias contados de hoje.
+  //
+  // Precisa ser efeito, e nao so valor inicial: a emissao nasce com hoje() e o
+  // usuario a corrige depois de abrir a tela -- se o vencimento nao seguisse a
+  // correcao, o valor inicial continuaria sendo a data de hoje de qualquer jeito.
+  // Para de seguir assim que o usuario mexe no campo, para nao desfazer escolha
+  // dele.
+  useEffect(() => {
+    if (!vencimentoEditado && nota.dataEmissao) {
+      setPrimeiroVencimento(nota.dataEmissao)
+    }
+  }, [nota.dataEmissao, vencimentoEditado])
 
   const setN = (campo) => (valor) => setNota((n) => ({ ...n, [campo]: valor }))
   function setItem(i, campo, valor) {
@@ -135,6 +154,10 @@ function FormRecebimento({ empresa, fornecedores, setFornecedores, produtos, set
       return notifications.show({ color: 'red', message: 'Informe o número da nota antes de gerar as parcelas.' })
     if (total <= 0)
       return notifications.show({ color: 'red', message: 'Informe o total da nota antes de gerar as parcelas.' })
+    // Sem base não há o que somar: somarDias('') daria Invalid Date e quebraria
+    // na formatação, com as parcelas já montadas pela metade.
+    if (!primeiroVencimento)
+      return notifications.show({ color: 'red', message: 'Informe a data de emissão ou o 1º vencimento.' })
 
     // resto da divisao vai pra ultima parcela, pra soma bater exatamente com o total
     const valorBase = Math.floor((total / qtd) * 100) / 100
@@ -331,7 +354,10 @@ function FormRecebimento({ empresa, fornecedores, setFornecedores, produtos, set
           <NumberInput label="Qtd. parcelas" min={1} decimalScale={0} w={110}
                        value={qtdParcelas} onChange={setQtdParcelas} />
           <TextInput label="1º vencimento" type="date" w={150} value={primeiroVencimento}
-                     onChange={(e) => setPrimeiroVencimento(e.currentTarget.value)} />
+                     onChange={(e) => {
+                       setVencimentoEditado(true)
+                       setPrimeiroVencimento(e.currentTarget.value)
+                     }} />
           <NumberInput label="Intervalo (dias)" min={0} decimalScale={0} w={130}
                        value={intervaloDias} onChange={setIntervaloDias} />
           <Button variant="light" onClick={gerarParcelas}>Gerar parcelas</Button>

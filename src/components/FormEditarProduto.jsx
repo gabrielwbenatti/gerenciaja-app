@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TextInput, Textarea, NumberInput, Select, Text, Group, Stack, Button, Badge } from '@mantine/core'
+import { TextInput, Textarea, NumberInput, Select, Switch, Text, Group, Stack, Button, Badge } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
 import { api } from '../api'
@@ -25,6 +25,7 @@ export function FormEditarProduto({ produto, aoSalvar }) {
       unidadeMedida: produto.unidadeMedida,
       precoVenda: produto.precoVenda ?? 0,
       estoqueMinimo: produto.estoqueMinimo ?? 0,
+      controlaEstoque: produto.controlaEstoque !== false,
       ncm: produto.dadosFiscais?.ncm ?? '',
     },
     validate: {
@@ -42,6 +43,7 @@ export function FormEditarProduto({ produto, aoSalvar }) {
         unidadeMedida: values.unidadeMedida,
         precoVenda: values.precoVenda === '' ? 0 : Number(values.precoVenda),
         estoqueMinimo: values.estoqueMinimo === '' ? 0 : Number(values.estoqueMinimo),
+        controlaEstoque: values.controlaEstoque,
         dadosFiscais: values.ncm ? { ncm: values.ncm } : null,
       })
       notifications.show({ color: 'green', message: `${values.nome} atualizado.` })
@@ -74,17 +76,23 @@ export function FormEditarProduto({ produto, aoSalvar }) {
                        thousandSeparator="." decimalSeparator=","
                        {...form.getInputProps('precoVenda')} />
           <NumberInput label="Estoque mínimo" min={0} decimalScale={3}
+                       disabled={!form.values.controlaEstoque}
                        {...form.getInputProps('estoqueMinimo')} />
         </Group>
-        <div>
-          <Text size="sm" fw={500} mb={4}>Controle de lote e validade</Text>
-          <Badge variant="light" color={produto.controlaLote ? 'blue' : 'gray'}>
-            {produto.controlaLote ? 'Controla lote' : 'Não controla lote'}
-          </Badge>
-          <Text size="xs" c="dimmed" mt={4}>
-            Não pode ser alterado depois de criado — já existem lotes/movimentos vinculados a esta configuração.
-          </Text>
-        </div>
+        <Switch label="Este produto controla estoque"
+                description="Desligue para serviço, frete ou taxa. Só é possível desligar enquanto o produto nunca movimentou."
+                {...form.getInputProps('controlaEstoque', { type: 'checkbox' })} />
+        {form.values.controlaEstoque && (
+          <div>
+            <Text size="sm" fw={500} mb={4}>Controle de lote e validade</Text>
+            <Badge variant="light" color={produto.controlaLote ? 'blue' : 'gray'}>
+              {produto.controlaLote ? 'Controla lote' : 'Não controla lote'}
+            </Badge>
+            <Text size="xs" c="dimmed" mt={4}>
+              Não pode ser alterado depois de criado — já existem lotes/movimentos vinculados a esta configuração.
+            </Text>
+          </div>
+        )}
         <Group justify="flex-end" mt="sm">
           <Button type="submit" loading={enviando}>Salvar alterações</Button>
         </Group>

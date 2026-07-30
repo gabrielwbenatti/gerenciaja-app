@@ -6,7 +6,7 @@ import {
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { api } from '../api'
-import { getEmpresa } from '../tenant'
+import { getEmpresa } from '../sessao'
 import { PageHeader } from '../components/PageHeader'
 import { ModalNovoProduto } from '../components/ModalNovoProduto'
 import { ModalNovaPessoa } from '../components/ModalNovaPessoa'
