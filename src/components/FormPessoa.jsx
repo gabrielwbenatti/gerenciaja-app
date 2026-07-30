@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { TextInput, Select, Chip, Group, Stack, Text, Button } from '@mantine/core'
+import { TextInput, Select, Chip, Group, Stack, Text, Button, Accordion } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
 import { api } from '../api'
 import { getEmpresa } from '../sessao'
 import { maskDocument, limparDocumento } from '../lib/format'
-
-const PAPEIS = ['CLIENTE', 'FORNECEDOR', 'TRANSPORTADORA', 'VENDEDOR']
+import { PAPEIS, CONTRIBUINTES } from '../lib/pessoa'
+import { ENDERECO_INICIAL, enderecoParaApi, faltaNoEndereco } from '../lib/endereco'
+import { CamposEndereco } from './CamposEndereco'
 
 // Empresa exige documento? undefined (empresa antiga no localStorage) => exige.
 const exigeDocumento = () => getEmpresa()?.documentoPessoaObrigatorio !== false
@@ -26,6 +27,8 @@ export function FormPessoa({ aoSalvar, nomeInicial = '', papeisIniciais = ['CLIE
     initialValues: {
       tipo: 'PJ', documento: '', nome: nomeInicial, nomeFantasia: '',
       papeis: papeisIniciais, email: '', telefone: '',
+      inscricaoEstadual: '', inscricaoMunicipal: '', contribuinteIcms: 'NAO_CONTRIBUINTE',
+      ...ENDERECO_INICIAL,
     },
     validate: {
       documento: (v, values) => {
@@ -70,10 +73,26 @@ export function FormPessoa({ aoSalvar, nomeInicial = '', papeisIniciais = ['CLIE
   }
 
   async function enviar(values) {
+    // Antes de enviar: endereço meio digitado volta como 400 genérico da API,
+    // sem dizer qual campo faltou.
+    const problema = faltaNoEndereco(values)
+    if (problema) return notifications.show({ color: 'red', message: problema })
+
     setEnviando(true)
     try {
-      const corpo = { ...values }
-      if (!corpo.email) delete corpo.email
+      const corpo = {
+        tipo: values.tipo,
+        documento: values.documento,
+        nome: values.nome,
+        nomeFantasia: values.nomeFantasia,
+        papeis: values.papeis,
+        inscricaoEstadual: values.inscricaoEstadual || null,
+        inscricaoMunicipal: values.inscricaoMunicipal || null,
+        contribuinteIcms: values.contribuinteIcms,
+        telefone: values.telefone,
+        endereco: enderecoParaApi(values),
+      }
+      if (values.email) corpo.email = values.email
       const pessoa = await api.post('/pessoas', corpo)
       notifications.show({ color: 'green', message: `${values.nome} cadastrado(a).` })
       aoSalvar(pessoa)
@@ -115,6 +134,31 @@ export function FormPessoa({ aoSalvar, nomeInicial = '', papeisIniciais = ['CLIE
           </Chip.Group>
           {form.errors.papeis && <Text c="red" size="xs" mt={4}>{form.errors.papeis}</Text>}
         </div>
+
+        {/* Endereço aberto por default: é o que a venda precisa para saber onde
+            entregar, e seção fechada é seção que ninguém preenche. O bloco
+            fiscal só passa a valer quando a NF-e entrar, então fica recolhido. */}
+        <Accordion multiple defaultValue={['endereco']} variant="contained">
+          <Accordion.Item value="endereco">
+            <Accordion.Control>Endereço</Accordion.Control>
+            <Accordion.Panel><CamposEndereco form={form} /></Accordion.Panel>
+          </Accordion.Item>
+
+          <Accordion.Item value="fiscal">
+            <Accordion.Control>Dados fiscais</Accordion.Control>
+            <Accordion.Panel>
+              <Stack>
+                <Group grow align="flex-start">
+                  <TextInput label="Inscrição estadual" {...form.getInputProps('inscricaoEstadual')} />
+                  <TextInput label="Inscrição municipal" {...form.getInputProps('inscricaoMunicipal')} />
+                </Group>
+                <Select label="Contribuinte de ICMS" data={CONTRIBUINTES} allowDeselect={false}
+                        description="Define destaque de ICMS e substituição tributária na NF-e"
+                        {...form.getInputProps('contribuinteIcms')} />
+              </Stack>
+            </Accordion.Panel>
+          </Accordion.Item>
+        </Accordion>
 
         <Group justify="flex-end" mt="sm">
           <Button type="submit" loading={enviando}>Salvar</Button>

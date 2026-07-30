@@ -6,12 +6,14 @@ import { useDisclosure } from '@mantine/hooks'
 import { api } from '../api'
 import { PageHeader } from '../components/PageHeader'
 import { ModalNovaPessoa } from '../components/ModalNovaPessoa'
+import { ModalEditarPessoa } from '../components/ModalEditarPessoa'
 import { formatDocument } from '../lib/format'
 
 export default function Pessoas() {
   const [lista, setLista] = useState(null)
   const [erro, setErro] = useState(null)
   const [aberto, { open, close }] = useDisclosure(false)
+  const [editando, setEditando] = useState(null)
 
   async function carregar() {
     setErro(null)
@@ -45,7 +47,7 @@ export default function Pessoas() {
                 <Table.Tr>
                   <Table.Th>Nome</Table.Th><Table.Th>Tipo</Table.Th>
                   <Table.Th>Documento</Table.Th><Table.Th>Papéis</Table.Th>
-                  <Table.Th>Contato</Table.Th>
+                  <Table.Th>Contato</Table.Th><Table.Th>Endereço</Table.Th><Table.Th />
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -63,6 +65,16 @@ export default function Pessoas() {
                       </Group>
                     </Table.Td>
                     <Table.Td>{p.email || p.telefone || '—'}</Table.Td>
+                    <Table.Td>
+                      {p.enderecos?.length
+                        ? <Text size="sm">{p.enderecos[0].cidade}/{p.enderecos[0].uf}</Text>
+                        : <Badge size="sm" variant="light" color="yellow">falta</Badge>}
+                    </Table.Td>
+                    <Table.Td>
+                      <Button variant="subtle" size="compact-sm" onClick={() => setEditando(p)}>
+                        Editar
+                      </Button>
+                    </Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -72,6 +84,7 @@ export default function Pessoas() {
       </Card>
 
       <ModalNovaPessoa opened={aberto} onClose={close} onCriado={carregar} />
+      <ModalEditarPessoa pessoa={editando} onClose={() => setEditando(null)} onSalvo={carregar} />
     </Stack>
   )
 }
